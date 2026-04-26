@@ -3,7 +3,7 @@ name: Build APK
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch: # Manuel olarak da başlatabilmen için bu satırı ekledim
+  workflow_dispatch:
 
 jobs:
   build:
@@ -16,7 +16,7 @@ jobs:
       - name: Python Hazirla
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11' # Daha güncel bir Python sürümü
+          python-version: '3.11'
 
       - name: Java Hazirla
         uses: actions/setup-java@v4
@@ -37,9 +37,7 @@ jobs:
       - name: APK Hazirla (Buildozer)
         run: |
           export PATH=$PATH:$HOME/.local/bin
-          # Önceki hatalı dosyalardan kalan artıkları temizle
-          buildozer android clean
-          # Detaylı log (v) ile build al
+          # Hata veren clean satırını sildik, direkt inşaata geçiyoruz
           yes | buildozer -v android debug
 
       - name: APK Dosyasini Yukle
