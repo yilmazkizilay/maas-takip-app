@@ -9,6 +9,19 @@ from kivy.uix.button import Button
 from kivy.uix.togglebutton import ToggleButton
 from kivy.uix.scrollview import ScrollView
 
+def dosya_yolunu_al(dosya_adi):
+    # Bu satır, uygulamanın Android'deki "özel kutusunu" bulur
+    from kivy.app import App
+    import os
+    
+    # Eğer uygulama çalışıyorsa özel klasörü bul, yoksa (bilgisayardaysan) olduğun yere yaz
+    try:
+        yol = App.get_running_app().user_data_dir
+    except:
+        yol = "."
+        
+    return os.path.join(yol, dosya_adi)
+  
 # --- HESAPLAMA AYARLARI ---
 AYLIK_SABIT_MAAS = 38500
 GUNLUK_SABIT_HAKEDIS = round(AYLIK_SABIT_MAAS / 30, 2)
