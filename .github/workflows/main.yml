@@ -4,17 +4,21 @@ on: [push]
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
 
+    steps:
+      # 1. Kodları çek (Güncel v4 sürümü)
+      - uses: actions/checkout@v4
+
+      # 2. Buildozer ile APK üret (Resmi Kivy aracı daha sağlamdır)
       - name: Build with Buildozer
-        uses: ArtemSerebrennikov/buildozer-action@v1
+        uses: kivy/buildozer-action@master
         with:
           workdir: .
           buildozer_version: stable
 
+      # 3. APK'yı sisteme yükle (Güncel v4 sürümü)
       - name: Upload APK
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: package
           path: bin/*.apk
