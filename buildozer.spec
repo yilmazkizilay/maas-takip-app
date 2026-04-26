@@ -20,6 +20,7 @@ android.archs = arm64-v8a, armeabi-v7a
 android.permissions = WRITE_EXTERNAL_STORAGE, READ_EXTERNAL_STORAGE, INTERNET
 android.api = 33
 android.minapi = 21
+android.accept_sdk_license = True
 
 [buildozer]
 log_level = 2
