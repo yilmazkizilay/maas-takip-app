@@ -3,8 +3,7 @@ on: [push]
 
 jobs:
   build:
-    # En stabil sürüm olan 22.04'ü kullanıyoruz
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Kodlari Cek
@@ -15,16 +14,21 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Java Kur
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
       - name: Sistem Paketlerini Hazirla
         run: |
           sudo apt update
-          sudo apt install -y git zip unzip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev build-essential libltdl-dev python3-pip openjdk-17-jdk lld
+          sudo apt install -y git zip unzip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev build-essential libltdl-dev python3-pip lld
           pip install --upgrade pip
-          pip install --user --upgrade buildozer cython virtualenv sh
+          pip install --user --upgrade buildozer cython virtualenv
 
       - name: APK Hazirla (Buildozer)
         run: |
           export PATH=$PATH:$HOME/.local/bin
-          # Her şeyi sıfırlayıp tertemiz bir build alıyoruz
-          buildozer android clean
+          # Sadece build komutunu veriyoruz, temizlik yapmiyoruz (cunku zaten sistem sifir)
           yes | buildozer -v android debug
