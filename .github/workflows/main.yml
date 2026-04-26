@@ -7,21 +7,26 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.10' # 3.11 bazen Buildozer'da huysuzluk yapabiliyor, 3.10 en sağlamı.
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
-      - name: Kurulum
+      - name: Sistem Paketlerini Kur
         run: |
+          sudo apt update
+          sudo apt install -y git zip unzip autoconf libtool pkg-config zlib1g-dev \
+          libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev \
+          build-essential libltdl-dev python3-pip lld
           pip install --upgrade pip
-          pip install "cython<3.0.0" wheel setuptools buildozer
-          sudo apt install -y git zip unzip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev build-essential libltdl-dev python3-pip lld
-      - name: Build
+          pip install wheel setuptools "cython<3.0.0" buildozer # Cython sürümünü sabitledik
+      - name: APK Hazirla
         run: |
           export PATH=$PATH:$HOME/.local/bin
+          # Önceki hatalı dosyalardan kurtulmak için temiz build
+          rm -rf .buildozer
           yes | buildozer -v android debug
       - uses: actions/upload-artifact@v4
         with:
-          name: temiz-apk
+          name: maas-takip-apk
           path: bin/*.apk
