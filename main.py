@@ -81,7 +81,7 @@ class MaasApp(App):
             ek_yevmiye = GUNLUK_SABIT_HAKEDIS if gun_ay in TATIL_TAKVIMI else 0
             gunluk_toplam = round(GUNLUK_SABIT_HAKEDIS + mesai_para + ek_yevmiye, 2)
 
-            # Veriyi oku ve güncelle (Pandas'sız versiyon)
+            # Veriyi oku ve güncelle
             satirlar = []
             guncellendi = False
             if os.path.exists(self.file_path):
@@ -98,7 +98,7 @@ class MaasApp(App):
             if not guncellendi:
                 satirlar.append([tarih, g, c, gunluk_toplam])
 
-            # Geri yaz
+            # Dosyaya yaz
             with open(self.file_path, mode='w', newline='', encoding='utf-8') as f:
                 writer = csv.writer(f)
                 writer.writerow(['Tarih', 'Giris', 'Cikis', 'Kazanc'])
