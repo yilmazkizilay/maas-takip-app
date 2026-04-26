@@ -18,7 +18,7 @@ fullscreen = 0
 # Android Ayarları
 android.archs = arm64-v8a, armeabi-v7a
 android.permissions = WRITE_EXTERNAL_STORAGE, READ_EXTERNAL_STORAGE, INTERNET
-android.api = 31
+android.api = 33
 android.minapi = 21
 
 [buildozer]
