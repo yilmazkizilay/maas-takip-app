@@ -6,6 +6,8 @@ package.name = maastakip
 package.domain = org.kanka
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas
+icon.filename = icon.png
+presplash.filename = loading.png
 version = 0.1
 
 # Gereksinimler (Hata payını düşürmek için sadece temel kütüphaneleri ekledik)
