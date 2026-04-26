@@ -11,8 +11,7 @@ presplash.filename = loading.png
 version = 0.1
 
 # Gereksinimler (Hata payını düşürmek için sadece temel kütüphaneleri ekledik)
-requirements = python3,kivy,pandas,numpy
-
+requirements = python3,kivy
 # Ekran Ayarları
 orientation = portrait
 fullscreen = 0
