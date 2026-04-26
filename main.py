@@ -1,27 +1,13 @@
-import pandas as pd
 import os
+import csv
 from datetime import datetime
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.label import Label
 from kivy.uix.textinput import TextInput
 from kivy.uix.button import Button
-from kivy.uix.togglebutton import ToggleButton
 from kivy.uix.scrollview import ScrollView
 
-def dosya_yolunu_al(dosya_adi):
-    # Bu satır, uygulamanın Android'deki "özel kutusunu" bulur
-    from kivy.app import App
-    import os
-    
-    # Eğer uygulama çalışıyorsa özel klasörü bul, yoksa (bilgisayardaysan) olduğun yere yaz
-    try:
-        yol = App.get_running_app().user_data_dir
-    except:
-        yol = "."
-        
-    return os.path.join(yol, dosya_adi)
-  
 # --- HESAPLAMA AYARLARI ---
 AYLIK_SABIT_MAAS = 38500
 GUNLUK_SABIT_HAKEDIS = round(AYLIK_SABIT_MAAS / 30, 2)
@@ -34,8 +20,8 @@ TATIL_TAKVIMI = ["01.01", "23.04", "01.05", "19.05", "15.07", "30.08", "29.10",
 class MaasApp(App):
     def build(self):
         self.title = "Maaş & Mesai Takip"
-        # Telefonun güvenli klasörüne dosyayı kaydet
-        self.file_name = os.path.join(self.user_data_dir, 'maas_verileri.csv')
+        # Android'de güvenli yazma klasörü
+        self.file_path = os.path.join(self.user_data_dir, 'maas_verileri.csv')
         self.dosya_hazirla()
         
         layout = BoxLayout(orientation='vertical', padding=15, spacing=10)
@@ -58,9 +44,9 @@ class MaasApp(App):
         self.btn_kaydet.bind(on_press=self.kaydet_isleme)
         layout.add_widget(self.btn_kaydet)
 
-        # Sonuç Listesi (Görsel tablo)
+        # Sonuç Listesi
         self.scroll = ScrollView()
-        self.liste_label = Label(text="Henüz kayıt yok...", size_hint_y=None, halign='center')
+        self.liste_label = Label(text="Henüz kayıt yok...", size_hint_y=None, halign='center', valign='top')
         self.liste_label.bind(texture_size=self.liste_label.setter('size'))
         self.scroll.add_widget(self.liste_label)
         layout.add_widget(self.scroll)
@@ -72,43 +58,71 @@ class MaasApp(App):
         return layout
 
     def dosya_hazirla(self):
-        if not os.path.exists(self.file_name):
-            pd.DataFrame(columns=['Tarih', 'Giris', 'Cikis', 'Kazanc']).to_csv(self.file_name, index=False)
+        if not os.path.exists(self.file_path):
+            with open(self.file_path, mode='w', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                writer.writerow(['Tarih', 'Giris', 'Cikis', 'Kazanc'])
 
     def kaydet_isleme(self, instance):
         tarih = self.tarih_in.text
         g, c = self.giris_in.text, self.cikis_in.text
-        gun_ay = tarih[:5] # "23.04" gibi
+        gun_ay = tarih[:5]
         
         try:
             # Mesai Hesabı
-            fark = (datetime.strptime(c, '%H:%M') - datetime.strptime(g, '%H:%M')).seconds / 3600
+            f1 = datetime.strptime(g, '%H:%M')
+            f2 = datetime.strptime(c, '%H:%M')
+            fark = (f2 - f1).seconds / 3600
+            
             fazla_mesai = max(0, (fark - 1) - 8)
             mesai_para = fazla_mesai * (SAATLIK_UCRET * MESAI_CARPANI)
             
-            # Tatil Ekstrası (+1 yevmiye)
+            # Tatil Ekstrası
             ek_yevmiye = GUNLUK_SABIT_HAKEDIS if gun_ay in TATIL_TAKVIMI else 0
-            
-            # Günlük Toplam
             gunluk_toplam = round(GUNLUK_SABIT_HAKEDIS + mesai_para + ek_yevmiye, 2)
 
-            df = pd.read_csv(self.file_name)
-            df = df[df['Tarih'] != tarih] # Varsa eskiyi sil
-            yeni = pd.DataFrame([[tarih, g, c, gunluk_toplam]], columns=['Tarih', 'Giris', 'Cikis', 'Kazanc'])
-            df = pd.concat([df, yeni], ignore_index=True)
-            df.to_csv(dosya_yolunu_al('maaslar.csv'), index=False)
+            # Veriyi oku ve güncelle (Pandas'sız versiyon)
+            satirlar = []
+            guncellendi = False
+            if os.path.exists(self.file_path):
+                with open(self.file_path, mode='r', encoding='utf-8') as f:
+                    reader = csv.reader(f)
+                    header = next(reader)
+                    for row in reader:
+                        if row[0] == tarih:
+                            satirlar.append([tarih, g, c, gunluk_toplam])
+                            guncellendi = True
+                        else:
+                            satirlar.append(row)
+            
+            if not guncellendi:
+                satirlar.append([tarih, g, c, gunluk_toplam])
+
+            # Geri yaz
+            with open(self.file_path, mode='w', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                writer.writerow(['Tarih', 'Giris', 'Cikis', 'Kazanc'])
+                writer.writerows(satirlar)
+
             self.listeyi_tazele()
-        except:
-            self.liste_label.text = "HATA: Saatleri kontrol et!"
+        except Exception as e:
+            self.liste_label.text = f"HATA: {str(e)}"
 
     def listeyi_tazele(self):
-        df = pd.read_csv(self.file_name)
-        if not df.empty:
-            metin = ""
-            for _, row in df.iterrows():
-                metin += f"{row['Tarih']} | {row['Giris']}-{row['Cikis']} | {row['Kazanc']} TL\n"
-            self.liste_label.text = metin
-            self.toplam_label.text = f"TOPLAM HAK EDİŞ: {df['Kazanc'].sum():,.2f} TL"
+        if not os.path.exists(self.file_path):
+            return
+
+        total = 0
+        metin = ""
+        with open(self.file_path, mode='r', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            next(reader) # başlığı atla
+            for row in reader:
+                metin += f"{row[0]} | {row[1]}-{row[2]} | {row[3]} TL\n"
+                total += float(row[3])
+        
+        self.liste_label.text = metin if metin else "Henüz kayıt yok..."
+        self.toplam_label.text = f"TOPLAM HAK EDİŞ: {total:,.2f} TL"
 
 if __name__ == "__main__":
     MaasApp().run()
