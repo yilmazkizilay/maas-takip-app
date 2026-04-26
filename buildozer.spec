@@ -9,7 +9,7 @@ source.include_exts = py,png,jpg,kv,atlas
 version = 0.1
 
 # Gereksinimler (Hata payını düşürmek için sadece temel kütüphaneleri ekledik)
-requirements = python3,kivy
+requirements = python3,kivy,pandas,numpy
 
 # Ekran Ayarları
 orientation = portrait
