@@ -3,7 +3,7 @@ on: [push]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04 # En stabil sürümde kalalım
 
     steps:
       - name: Kodlari Cek
@@ -12,23 +12,19 @@ jobs:
       - name: Python Kur
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-
-      - name: Java Kur
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+          python-version: '3.10' # En uyumlu sürüm
 
       - name: Sistem Paketlerini Hazirla
         run: |
-          sudo apt update
-          sudo apt install -y git zip unzip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev build-essential libltdl-dev python3-pip lld openjdk-17-jdk
+          sudo apt update || true
+          sudo apt install -y --fix-missing git zip unzip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev build-essential libltdl-dev python3-pip openjdk-17-jdk
+          # Cython'u Kivy ile en uyumlu sürüme sabitliyoruz
           pip install --upgrade pip
-          pip install --user --upgrade buildozer cython virtualenv
+          pip install "cython<3.0.0" wheel setuptools
+          pip install --user --upgrade buildozer
 
       - name: APK Hazirla (Buildozer)
         run: |
           export PATH=$PATH:$HOME/.local/bin
-          # Soru sormadan, temiz build al
+          # Hata verirse nedenini görmek için log seviyesini en sona çekiyoruz
           yes | buildozer -v android debug
