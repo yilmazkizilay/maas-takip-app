@@ -96,7 +96,7 @@ class MaasApp(App):
             df = df[df['Tarih'] != tarih] # Varsa eskiyi sil
             yeni = pd.DataFrame([[tarih, g, c, gunluk_toplam]], columns=['Tarih', 'Giris', 'Cikis', 'Kazanc'])
             df = pd.concat([df, yeni], ignore_index=True)
-            df.to_csv(self.file_name, index=False)
+            df.to_csv(dosya_yolunu_al('maaslar.csv'), index=False)
             self.listeyi_tazele()
         except:
             self.liste_label.text = "HATA: Saatleri kontrol et!"
