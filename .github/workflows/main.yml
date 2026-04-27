@@ -29,13 +29,11 @@ jobs:
           pip install --upgrade pip
           pip install wheel setuptools "cython<3.0.0" buildozer
 
-      - name: APK Hazirla
-        run: |
-          export PATH=$PATH:$HOME/.local/bin
-          # Önceki tüm kalıntıları temizle
-          buildozer android clean
-          # yes | kullanmadan, daha kontrollü build
-          buildozer -v android debug
-        env:
+- name: APK Hazirla
+  env:
+    APP_ANDROID_ACCEPT_SDK_LICENSE: "1"
+  run: |
+    export PATH=$PATH:$HOME/.local/bin
+    buildozer -v android debug
           # Buildozer'ın takılmaması için interaktif girişi kapat
           APP_ANDROID_ACCEPT_SDK_LICENSE: "1"
