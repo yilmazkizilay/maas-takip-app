@@ -5,9 +5,7 @@ from datetime import datetime
 
 from kivy.app import App
 from kivy.core.window import Window
-from kivy.graphics import Color, RoundedRectangle
 from kivy.metrics import dp
-from kivy.properties import ListProperty, NumericProperty
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.scrollview import ScrollView
@@ -16,6 +14,7 @@ from kivy.uix.button import Button
 from kivy.uix.spinner import Spinner
 from kivy.uix.textinput import TextInput
 from kivy.uix.popup import Popup
+from kivy.uix.tabbedpanel import TabbedPanel, TabbedPanelItem
 
 
 ALANLAR = [
@@ -38,20 +37,13 @@ ALANLAR = [
     "aciklama",
 ]
 
-RENK_ARKA_PLAN = [0.05, 0.07, 0.11, 1]
-RENK_KART = [0.10, 0.14, 0.22, 1]
-RENK_KART_2 = [0.13, 0.18, 0.28, 1]
-RENK_YAZI = [0.95, 0.97, 1.00, 1]
-RENK_SOLUK_YAZI = [0.70, 0.76, 0.86, 1]
-RENK_MAVI = [0.18, 0.48, 0.95, 1]
-RENK_MAVI_KOYU = [0.10, 0.35, 0.78, 1]
-RENK_YESIL = [0.10, 0.65, 0.38, 1]
-RENK_YESIL_KOYU = [0.07, 0.48, 0.28, 1]
-RENK_KIRMIZI = [0.88, 0.20, 0.25, 1]
-RENK_KIRMIZI_KOYU = [0.62, 0.12, 0.16, 1]
-RENK_TURUNCU = [0.95, 0.55, 0.16, 1]
-RENK_MOR = [0.45, 0.28, 0.95, 1]
-RENK_MOR_KOYU = [0.30, 0.18, 0.72, 1]
+RENK_BG = (0.05, 0.07, 0.11, 1)
+RENK_TEXT = (0.95, 0.97, 1, 1)
+RENK_MUTED = (0.72, 0.78, 0.88, 1)
+RENK_BLUE = (0.18, 0.48, 0.95, 1)
+RENK_GREEN = (0.10, 0.65, 0.38, 1)
+RENK_RED = (0.88, 0.20, 0.25, 1)
+RENK_ORANGE = (0.95, 0.55, 0.16, 1)
 
 HAFTA_GUNLERI = {
     "Pazartesi": 0,
@@ -81,10 +73,7 @@ GUN_TURU_SECENEKLERI = [
     "Yarım Resmi Tatil",
 ]
 
-CALISMA_SECENEKLERI = [
-    "Çalıştım",
-    "Çalışmadım",
-]
+CALISMA_SECENEKLERI = ["Çalıştım", "Çalışmadım"]
 
 RESMI_TATILLER_2026 = {
     "2026-03-19": ("Ramazan Bayramı Arifesi", 0.5),
@@ -120,24 +109,19 @@ def sayiya_cevir(deger):
     try:
         if deger is None:
             return 0.0
-
-        deger = str(deger).replace(",", ".").strip()
-
-        if deger == "":
+        metin = str(deger).replace(",", ".").strip()
+        if metin == "":
             return 0.0
-
-        return float(deger)
+        return float(metin)
     except Exception:
         return 0.0
 
 
 def sayi_yaz(deger):
-    deger = sayiya_cevir(deger)
-
-    if deger == int(deger):
-        return str(int(deger))
-
-    return str(deger).replace(".", ",")
+    sayi = sayiya_cevir(deger)
+    if sayi == int(sayi):
+        return str(int(sayi))
+    return f"{sayi:.2f}".rstrip("0").rstrip(".").replace(".", ",")
 
 
 def para_yaz(deger):
@@ -145,18 +129,12 @@ def para_yaz(deger):
 
 
 def tarih_parse(tarih_metni):
-    tarih_metni = str(tarih_metni).strip()
-
-    formatlar = [
-        "%d.%m.%Y",
-        "%d/%m/%Y",
-        "%Y-%m-%d",
-        "%d-%m-%Y",
-    ]
+    metin = str(tarih_metni).strip()
+    formatlar = ["%d.%m.%Y", "%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y"]
 
     for fmt in formatlar:
         try:
-            return datetime.strptime(tarih_metni, fmt)
+            return datetime.strptime(metin, fmt)
         except Exception:
             pass
 
@@ -169,10 +147,9 @@ def tarih_ay_anahtari(tarih_metni):
     if tarih:
         return tarih.strftime("%m.%Y")
 
-    tarih_metni = str(tarih_metni).strip()
-
-    if len(tarih_metni) >= 7:
-        return tarih_metni[-7:]
+    metin = str(tarih_metni).strip()
+    if len(metin) >= 7:
+        return metin[-7:]
 
     return ""
 
@@ -223,386 +200,441 @@ def gun_turu_hesapla(tarih_metni, hafta_tatili_gunu, gun_turu_secim):
     if tatil_adi:
         if tatil_orani == 0.5:
             return "Yarım Resmi Tatil", tatil_adi, tatil_orani
-
         return "Resmi Tatil", tatil_adi, tatil_orani
 
-    hafta_tatili_index = HAFTA_GUNLERI.get(hafta_tatili_gunu, 6)
+    hafta_index = HAFTA_GUNLERI.get(hafta_tatili_gunu, 6)
 
-    if tarih.weekday() == hafta_tatili_index:
+    if tarih.weekday() == hafta_index:
         return "Hafta Tatili", hafta_tatili_gunu, 0.0
 
     return "Normal Gün", HAFTA_GUN_ADLARI[tarih.weekday()], 0.0
 
 
-class YuvarlakKutu(BoxLayout):
-    bg_color = ListProperty([1, 1, 1, 1])
-    radius = NumericProperty(18)
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-        with self.canvas.before:
-            self.renk = Color(rgba=self.bg_color)
-            self.arka_plan = RoundedRectangle(
-                pos=self.pos,
-                size=self.size,
-                radius=[self.radius]
-            )
-
-        self.bind(pos=self.guncelle)
-        self.bind(size=self.guncelle)
-        self.bind(bg_color=self.renk_guncelle)
-        self.bind(radius=self.guncelle)
-
-    def guncelle(self, *args):
-        self.arka_plan.pos = self.pos
-        self.arka_plan.size = self.size
-        self.arka_plan.radius = [self.radius]
-
-    def renk_guncelle(self, *args):
-        self.renk.rgba = self.bg_color
-
-
-class ModernButon(Button):
-    bg_color = ListProperty(RENK_MAVI)
-    bg_down_color = ListProperty(RENK_MAVI_KOYU)
-    radius = NumericProperty(14)
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-        self.background_normal = ""
-        self.background_down = ""
-        self.background_color = [0, 0, 0, 0]
-        self.color = RENK_YAZI
-        self.bold = True
-        self.font_size = dp(13)
-
-        with self.canvas.before:
-            self.renk = Color(rgba=self.bg_color)
-            self.arka_plan = RoundedRectangle(
-                pos=self.pos,
-                size=self.size,
-                radius=[self.radius]
-            )
-
-        self.bind(pos=self.guncelle)
-        self.bind(size=self.guncelle)
-        self.bind(state=self.durum_guncelle)
-        self.bind(bg_color=self.durum_guncelle)
-        self.bind(bg_down_color=self.durum_guncelle)
-
-    def guncelle(self, *args):
-        self.arka_plan.pos = self.pos
-        self.arka_plan.size = self.size
-        self.arka_plan.radius = [self.radius]
-
-    def durum_guncelle(self, *args):
-        if self.state == "down":
-            self.renk.rgba = self.bg_down_color
-        else:
-            self.renk.rgba = self.bg_color
-
-
-class ModernSpinner(Spinner):
-    bg_color = ListProperty(RENK_KART_2)
-    bg_down_color = ListProperty([0.18, 0.24, 0.36, 1])
-    radius = NumericProperty(14)
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-        self.background_normal = ""
-        self.background_down = ""
-        self.background_color = [0, 0, 0, 0]
-        self.color = RENK_YAZI
-        self.bold = True
-        self.font_size = dp(13)
-
-        with self.canvas.before:
-            self.renk = Color(rgba=self.bg_color)
-            self.arka_plan = RoundedRectangle(
-                pos=self.pos,
-                size=self.size,
-                radius=[self.radius]
-            )
-
-        self.bind(pos=self.guncelle)
-        self.bind(size=self.guncelle)
-        self.bind(state=self.durum_guncelle)
-
-    def guncelle(self, *args):
-        self.arka_plan.pos = self.pos
-        self.arka_plan.size = self.size
-        self.arka_plan.radius = [self.radius]
-
-    def durum_guncelle(self, *args):
-        if self.state == "down":
-            self.renk.rgba = self.bg_down_color
-        else:
-            self.renk.rgba = self.bg_color
-
-
-class ModernInput(TextInput):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-        self.background_normal = ""
-        self.background_active = ""
-        self.background_color = [0.94, 0.96, 1.00, 1]
-        self.foreground_color = [0.05, 0.07, 0.11, 1]
-        self.cursor_color = RENK_MAVI
-        self.hint_text_color = [0.45, 0.48, 0.55, 1]
-        self.font_size = dp(15)
-        self.padding = [dp(10), dp(10), dp(10), dp(10)]
-        self.multiline = False
-
-
 class MaasTakipApp(App):
     def build(self):
-        self.title = "Maaş Takip v0.5"
-        Window.clearcolor = RENK_ARKA_PLAN
+        self.title = "Maaş Takip"
+        Window.clearcolor = RENK_BG
         Window.softinput_mode = "below_target"
 
         self.dosya_yolu = os.path.join(self.user_data_dir, "maas_kayitlari.csv")
         self.ayarlar_yolu = os.path.join(self.user_data_dir, "ayarlar.json")
+
         self.ayarlar = self.ayarlari_oku()
-        self.dosyayi_hazirla_ve_duzelt()
         self.gorunen_indeksler = []
 
-        ana = YuvarlakKutu(
-            orientation="vertical",
-            padding=dp(10),
-            spacing=dp(8),
-            bg_color=RENK_ARKA_PLAN,
-            radius=0
-        )
+        self.dosyayi_hazirla_ve_duzelt()
 
-        ust_kart = YuvarlakKutu(
-            orientation="vertical",
-            padding=dp(14),
-            spacing=dp(2),
-            size_hint_y=None,
-            height=dp(82),
-            bg_color=RENK_KART,
-            radius=22
-        )
+        root = TabbedPanel(do_default_tab=False)
+        root.tab_width = dp(95)
 
-        baslik = Label(
-            text="Maaş Takip v0.5",
-            color=RENK_YAZI,
-            font_size=dp(24),
-            bold=True,
-            halign="left",
-            valign="middle"
-        )
-        baslik.bind(width=self.label_genislik_ayarla)
+        self.tab_ayarlar = TabbedPanelItem(text="Ayarlar")
+        self.tab_ekle = TabbedPanelItem(text="Kayıt Ekle")
+        self.tab_kayitlar = TabbedPanelItem(text="Kayıtlar")
+        self.tab_ozet = TabbedPanelItem(text="Özet")
 
-        alt = Label(
-            text="Ayarlar kaydedilir, kayıtlar maaşa göre otomatik hesaplanır",
-            color=RENK_SOLUK_YAZI,
-            font_size=dp(12),
-            halign="left",
-            valign="middle"
-        )
-        alt.bind(width=self.label_genislik_ayarla)
+        root.add_widget(self.tab_ayarlar)
+        root.add_widget(self.tab_ekle)
+        root.add_widget(self.tab_kayitlar)
+        root.add_widget(self.tab_ozet)
 
-        ust_kart.add_widget(baslik)
-        ust_kart.add_widget(alt)
-        ana.add_widget(ust_kart)
+        self.tab_ayarlar.content = self.ekran_ayarlar()
+        self.tab_ekle.content = self.ekran_kayit_ekle()
+        self.tab_kayitlar.content = self.ekran_kayitlar()
+        self.tab_ozet.content = self.ekran_ozet()
 
-        nav = BoxLayout(
-            orientation="horizontal",
-            size_hint_y=None,
-            height=dp(48),
-            spacing=dp(6)
-        )
+        self.ayar_bilgisi_guncelle()
+        self.kayit_onizleme_guncelle()
+        self.kayitlari_listele()
+        self.ozet_goster()
 
-        b_ayar = ModernButon(
-            text="Ayarlar",
-            bg_color=RENK_MOR,
-            bg_down_color=RENK_MOR_KOYU
-        )
-        b_ekle = ModernButon(
-            text="Kayıt Ekle",
-            bg_color=RENK_YESIL,
-            bg_down_color=RENK_YESIL_KOYU
-        )
-        b_kayit = ModernButon(
-            text="Kayıtlar",
-            bg_color=RENK_MAVI,
-            bg_down_color=RENK_MAVI_KOYU
-        )
-        b_ozet = ModernButon(
-            text="Özet",
-            bg_color=RENK_TURUNCU,
-            bg_down_color=[0.75, 0.38, 0.08, 1]
-        )
+        return root
 
-        b_ayar.bind(on_press=lambda x: self.show_ayarlar())
-        b_ekle.bind(on_press=lambda x: self.show_kayit_ekle())
-        b_kayit.bind(on_press=lambda x: self.show_kayitlar())
-        b_ozet.bind(on_press=lambda x: self.show_ozet())
-
-        nav.add_widget(b_ayar)
-        nav.add_widget(b_ekle)
-        nav.add_widget(b_kayit)
-        nav.add_widget(b_ozet)
-        ana.add_widget(nav)
-
-        self.content = YuvarlakKutu(
-            orientation="vertical",
-            padding=dp(0),
-            spacing=dp(0),
-            bg_color=RENK_ARKA_PLAN,
-            radius=0
-        )
-        ana.add_widget(self.content)
-
-        self.show_ayarlar()
-
-        return ana
-
-    def label_genislik_ayarla(self, instance, width):
-        instance.text_size = (width, None)
-
-    def label_yukseklik_ayarla(self, instance, texture_size):
-        instance.height = texture_size[1] + dp(20)
-
-    def temizle(self):
-        self.content.clear_widgets()
-
-    def kart(self, **kwargs):
-        return YuvarlakKutu(
-            bg_color=RENK_KART,
-            radius=22,
-            padding=dp(12),
-            spacing=dp(8),
-            **kwargs
-        )
-
-    def input_satiri(self, form, baslik, varsayilan, hint=""):
-        lbl = Label(
-            text=baslik,
-            size_hint_y=None,
-            height=dp(42),
-            color=RENK_SOLUK_YAZI,
-            font_size=dp(13),
-            halign="left",
-            valign="middle"
-        )
-        lbl.bind(width=self.label_genislik_ayarla)
-
-        inp = ModernInput(
-            text=str(varsayilan),
-            hint_text=hint,
-            size_hint_y=None,
-            height=dp(42)
-        )
-
-        form.add_widget(lbl)
-        form.add_widget(inp)
-
-        return inp
-
-    def spinner_satiri(self, form, baslik, varsayilan, secenekler):
-        lbl = Label(
-            text=baslik,
-            size_hint_y=None,
-            height=dp(42),
-            color=RENK_SOLUK_YAZI,
-            font_size=dp(13),
-            halign="left",
-            valign="middle"
-        )
-        lbl.bind(width=self.label_genislik_ayarla)
-
-        spn = ModernSpinner(
-            text=varsayilan,
-            values=secenekler,
-            size_hint_y=None,
-            height=dp(42)
-        )
-
-        form.add_widget(lbl)
-        form.add_widget(spn)
-
-        return spn
-
-    def ekran_baslik(self, metin, alt_metin=""):
-        kutu = YuvarlakKutu(
+    def panel(self):
+        return BoxLayout(
             orientation="vertical",
             padding=dp(12),
-            spacing=dp(2),
-            size_hint_y=None,
-            height=dp(70),
-            bg_color=RENK_KART_2,
-            radius=20
+            spacing=dp(8),
         )
 
-        baslik = Label(
+    def baslik(self, metin, alt=""):
+        kutu = BoxLayout(
+            orientation="vertical",
+            size_hint_y=None,
+            height=dp(74),
+            spacing=dp(2),
+        )
+
+        lbl = Label(
             text=metin,
-            color=RENK_YAZI,
-            font_size=dp(20),
+            color=RENK_TEXT,
+            font_size=dp(23),
             bold=True,
             halign="left",
-            valign="middle"
+            valign="middle",
         )
-        baslik.bind(width=self.label_genislik_ayarla)
-        kutu.add_widget(baslik)
+        lbl.bind(size=self.label_size)
+        kutu.add_widget(lbl)
 
-        if alt_metin:
-            alt = Label(
-                text=alt_metin,
-                color=RENK_SOLUK_YAZI,
-                font_size=dp(12),
+        if alt:
+            alt_lbl = Label(
+                text=alt,
+                color=RENK_MUTED,
+                font_size=dp(13),
                 halign="left",
-                valign="middle"
+                valign="middle",
             )
-            alt.bind(width=self.label_genislik_ayarla)
-            kutu.add_widget(alt)
+            alt_lbl.bind(size=self.label_size)
+            kutu.add_widget(alt_lbl)
 
         return kutu
 
+    def label_size(self, instance, size):
+        instance.text_size = (instance.width, None)
+
+    def label_height(self, instance, texture_size):
+        instance.height = texture_size[1] + dp(20)
+
+    def label(self, text, size=14, bold=False, muted=False, height=None):
+        lbl = Label(
+            text=text,
+            color=RENK_MUTED if muted else RENK_TEXT,
+            font_size=dp(size),
+            bold=bold,
+            halign="left",
+            valign="top",
+        )
+        lbl.bind(size=self.label_size)
+
+        if height is not None:
+            lbl.size_hint_y = None
+            lbl.height = dp(height)
+
+        return lbl
+
+    def input(self, text="", hint=""):
+        return TextInput(
+            text=str(text),
+            hint_text=hint,
+            multiline=False,
+            size_hint_y=None,
+            height=dp(44),
+            background_color=(0.94, 0.96, 1, 1),
+            foreground_color=(0.05, 0.07, 0.11, 1),
+            cursor_color=RENK_BLUE,
+            padding=[dp(10), dp(10), dp(10), dp(10)],
+            font_size=dp(15),
+        )
+
+    def spinner(self, text, values):
+        return Spinner(
+            text=text,
+            values=values,
+            size_hint_y=None,
+            height=dp(44),
+            background_color=(0.13, 0.18, 0.28, 1),
+            color=RENK_TEXT,
+            font_size=dp(13),
+        )
+
+    def button(self, text, color=RENK_BLUE):
+        return Button(
+            text=text,
+            size_hint_y=None,
+            height=dp(48),
+            background_normal="",
+            background_color=color,
+            color=RENK_TEXT,
+            bold=True,
+            font_size=dp(14),
+        )
+
+    def row_label(self, text):
+        lbl = Label(
+            text=text,
+            color=RENK_MUTED,
+            font_size=dp(13),
+            size_hint_y=None,
+            height=dp(44),
+            halign="left",
+            valign="middle",
+        )
+        lbl.bind(size=self.label_size)
+        return lbl
+
+    def add_row(self, grid, text, widget):
+        grid.add_widget(self.row_label(text))
+        grid.add_widget(widget)
+
     def mesaj_goster(self, baslik, mesaj):
-        kutu = YuvarlakKutu(
+        kutu = BoxLayout(
             orientation="vertical",
             padding=dp(14),
             spacing=dp(12),
-            bg_color=RENK_KART,
-            radius=20
         )
 
         yazi = Label(
             text=mesaj,
-            color=RENK_YAZI,
-            font_size=dp(15),
             halign="center",
-            valign="middle"
+            valign="middle",
+            color=RENK_TEXT,
         )
-        yazi.bind(width=self.label_genislik_ayarla)
+        yazi.bind(size=self.label_size)
 
-        kapat_btn = ModernButon(
-            text="Tamam",
-            size_hint_y=None,
-            height=dp(46),
-            bg_color=RENK_MAVI,
-            bg_down_color=RENK_MAVI_KOYU
-        )
+        btn = self.button("Tamam", RENK_BLUE)
 
         kutu.add_widget(yazi)
-        kutu.add_widget(kapat_btn)
+        kutu.add_widget(btn)
 
         popup = Popup(
             title=baslik,
             content=kutu,
-            size_hint=(0.88, 0.42),
-            background_color=[0.05, 0.07, 0.11, 1],
-            separator_color=RENK_MAVI,
-            title_color=RENK_YAZI
+            size_hint=(0.86, 0.38),
+            background_color=(0.10, 0.14, 0.22, 1),
+            title_color=RENK_TEXT,
         )
-        kapat_btn.bind(on_press=popup.dismiss)
+
+        btn.bind(on_press=popup.dismiss)
         popup.open()
+
+    def ekran_ayarlar(self):
+        ana = self.panel()
+
+        ana.add_widget(
+            self.baslik(
+                "Ayarlar",
+                "Maaşını bir kere yaz; uygulama hesabı ona göre yapsın.",
+            )
+        )
+
+        grid = GridLayout(
+            cols=2,
+            spacing=dp(7),
+            size_hint_y=None,
+        )
+        grid.bind(minimum_height=grid.setter("height"))
+
+        self.ayar_maas = self.input(
+            self.ayarlar.get("aylik_maas", "0"),
+            "Örn: 35000",
+        )
+        self.ayar_saat = self.input(
+            self.ayarlar.get("gunluk_calisma_saati", "7.5"),
+            "Örn: 7.5",
+        )
+        self.ayar_katsayi = self.input(
+            self.ayarlar.get("mesai_katsayi", "1.5"),
+            "Örn: 1.5",
+        )
+        self.ayar_tatil = self.spinner(
+            self.ayarlar.get("hafta_tatili_gunu", "Pazar"),
+            list(HAFTA_GUNLERI.keys()),
+        )
+
+        self.add_row(grid, "Aylık maaş", self.ayar_maas)
+        self.add_row(grid, "Günlük çalışma saati", self.ayar_saat)
+        self.add_row(grid, "Mesai katsayısı", self.ayar_katsayi)
+        self.add_row(grid, "Hafta tatilin", self.ayar_tatil)
+
+        ana.add_widget(grid)
+
+        self.ayar_bilgi = self.label(
+            "",
+            size=14,
+            muted=True,
+            height=96,
+        )
+        ana.add_widget(self.ayar_bilgi)
+
+        btns = BoxLayout(
+            orientation="horizontal",
+            size_hint_y=None,
+            height=dp(52),
+            spacing=dp(8),
+        )
+
+        kaydet = self.button("Ayarları Kaydet", RENK_GREEN)
+        hesap = self.button("Hesabı Göster", RENK_BLUE)
+
+        kaydet.bind(on_press=self.ayarlari_kaydet)
+        hesap.bind(on_press=lambda x: self.ayar_bilgisi_guncelle())
+
+        btns.add_widget(kaydet)
+        btns.add_widget(hesap)
+
+        ana.add_widget(btns)
+
+        self.ayar_maas.bind(text=lambda *args: self.ayar_bilgisi_guncelle())
+        self.ayar_saat.bind(text=lambda *args: self.ayar_bilgisi_guncelle())
+
+        return ana
+
+    def ekran_kayit_ekle(self):
+        ana = self.panel()
+
+        ana.add_widget(
+            self.baslik(
+                "Kayıt Ekle",
+                "Tarih, gün türü, mesai, prim, avans ve kesinti gir.",
+            )
+        )
+
+        scroll = ScrollView()
+
+        grid = GridLayout(
+            cols=2,
+            spacing=dp(7),
+            size_hint_y=None,
+        )
+        grid.bind(minimum_height=grid.setter("height"))
+
+        self.kayit_tarih = self.input(bugunun_tarihi(), "27.04.2026")
+        self.kayit_gun_turu = self.spinner("Otomatik", GUN_TURU_SECENEKLERI)
+        self.kayit_calisma = self.spinner("Çalıştım", CALISMA_SECENEKLERI)
+        self.kayit_mesai = self.input("0", "Örn: 2")
+        self.kayit_prim = self.input("0", "Örn: 500")
+        self.kayit_avans = self.input("0", "Örn: 1000")
+        self.kayit_kesinti = self.input("0", "Örn: 250")
+        self.kayit_aciklama = self.input("", "Örn: Bayram mesaisi")
+
+        self.add_row(grid, "Tarih", self.kayit_tarih)
+        self.add_row(grid, "Gün türü", self.kayit_gun_turu)
+        self.add_row(grid, "Durum", self.kayit_calisma)
+        self.add_row(grid, "Ek mesai saati", self.kayit_mesai)
+        self.add_row(grid, "Prim", self.kayit_prim)
+        self.add_row(grid, "Avans", self.kayit_avans)
+        self.add_row(grid, "Kesinti", self.kayit_kesinti)
+        self.add_row(grid, "Açıklama", self.kayit_aciklama)
+
+        scroll.add_widget(grid)
+        ana.add_widget(scroll)
+
+        self.kayit_onizleme = self.label(
+            "",
+            size=13,
+            muted=True,
+            height=112,
+        )
+        ana.add_widget(self.kayit_onizleme)
+
+        btns = BoxLayout(
+            orientation="horizontal",
+            size_hint_y=None,
+            height=dp(52),
+            spacing=dp(8),
+        )
+
+        hesap = self.button("Hesapla", RENK_BLUE)
+        kaydet = self.button("Kaydet", RENK_GREEN)
+
+        hesap.bind(on_press=lambda x: self.kayit_onizleme_guncelle())
+        kaydet.bind(on_press=self.kaydet)
+
+        btns.add_widget(hesap)
+        btns.add_widget(kaydet)
+
+        ana.add_widget(btns)
+
+        return ana
+
+    def ekran_kayitlar(self):
+        ana = self.panel()
+
+        ana.add_widget(
+            self.baslik(
+                "Kayıtlar",
+                "Ay filtresi kullanabilir, numara yazarak kayıt silebilirsin.",
+            )
+        )
+
+        filtre = BoxLayout(
+            orientation="horizontal",
+            size_hint_y=None,
+            height=dp(48),
+            spacing=dp(7),
+        )
+
+        self.kayitlar_ay = self.input(bu_ay(), "Ay: 04.2026")
+
+        ay_btn = self.button("Ay", RENK_ORANGE)
+        tum_btn = self.button("Tümü", RENK_BLUE)
+
+        ay_btn.bind(on_press=lambda x: self.kayitlari_listele())
+        tum_btn.bind(on_press=self.kayitlar_tumunu_goster)
+
+        filtre.add_widget(self.kayitlar_ay)
+        filtre.add_widget(ay_btn)
+        filtre.add_widget(tum_btn)
+
+        ana.add_widget(filtre)
+
+        sil = BoxLayout(
+            orientation="horizontal",
+            size_hint_y=None,
+            height=dp(48),
+            spacing=dp(7),
+        )
+
+        self.silinecek_no = self.input("", "Silinecek no")
+        self.silinecek_no.input_filter = "int"
+
+        sil_btn = self.button("Kaydı Sil", RENK_RED)
+        sil_btn.bind(on_press=self.kaydi_sil)
+
+        sil.add_widget(self.silinecek_no)
+        sil.add_widget(sil_btn)
+
+        ana.add_widget(sil)
+
+        self.kayitlar_ozet = self.label(
+            "",
+            size=13,
+            muted=True,
+            height=102,
+        )
+        ana.add_widget(self.kayitlar_ozet)
+
+        scroll = ScrollView()
+
+        self.kayit_label = self.label("", size=13)
+        self.kayit_label.size_hint_y = None
+        self.kayit_label.bind(texture_size=self.label_height)
+
+        scroll.add_widget(self.kayit_label)
+        ana.add_widget(scroll)
+
+        return ana
+
+    def ekran_ozet(self):
+        ana = self.panel()
+
+        ana.add_widget(
+            self.baslik(
+                "Aylık Özet",
+                "Maaş + tatil + mesai + prim - avans - kesinti.",
+            )
+        )
+
+        filtre = BoxLayout(
+            orientation="horizontal",
+            size_hint_y=None,
+            height=dp(48),
+            spacing=dp(7),
+        )
+
+        self.ozet_ay = self.input(bu_ay(), "Ay: 04.2026")
+        goster = self.button("Özeti Göster", RENK_ORANGE)
+
+        goster.bind(on_press=lambda x: self.ozet_goster())
+
+        filtre.add_widget(self.ozet_ay)
+        filtre.add_widget(goster)
+
+        ana.add_widget(filtre)
+
+        self.ozet_label = self.label("", size=15)
+        ana.add_widget(self.ozet_label)
+
+        return ana
 
     def ayarlari_oku(self):
         ayarlar = varsayilan_ayarlar()
@@ -620,20 +652,54 @@ class MaasTakipApp(App):
         if ayarlar.get("hafta_tatili_gunu") not in HAFTA_GUNLERI:
             ayarlar["hafta_tatili_gunu"] = "Pazar"
 
+        if str(ayarlar.get("aylik_maas", "")).strip() == "":
+            ayarlar["aylik_maas"] = "0"
+
         if str(ayarlar.get("mesai_katsayi", "")).strip() == "":
             ayarlar["mesai_katsayi"] = "1.5"
 
         if str(ayarlar.get("gunluk_calisma_saati", "")).strip() == "":
             ayarlar["gunluk_calisma_saati"] = "7.5"
 
-        if str(ayarlar.get("aylik_maas", "")).strip() == "":
-            ayarlar["aylik_maas"] = "0"
-
         return ayarlar
 
     def ayarlari_yaz(self):
         with open(self.ayarlar_yolu, "w", encoding="utf-8") as f:
             json.dump(self.ayarlar, f, ensure_ascii=False, indent=2)
+
+    def ayar_bilgisi_guncelle(self):
+        maas = sayiya_cevir(self.ayar_maas.text)
+        gunluk_saat = sayiya_cevir(self.ayar_saat.text)
+
+        gunluk = maas / 30 if maas > 0 else 0
+        saatlik = gunluk / gunluk_saat if gunluk > 0 and gunluk_saat > 0 else 0
+        aylik_saat = gunluk_saat * 30 if gunluk_saat > 0 else 0
+
+        self.ayar_bilgi.text = (
+            f"Aylık maaş: {para_yaz(maas)}\n"
+            f"Günlük ücret: {para_yaz(gunluk)}\n"
+            f"Saatlik ücret: {para_yaz(saatlik)}\n"
+            f"Aylık saat hesabı: {sayi_yaz(aylik_saat)} saat"
+        )
+
+    def ayarlari_kaydet(self, instance=None):
+        self.ayarlar["aylik_maas"] = self.ayar_maas.text.strip() or "0"
+        self.ayarlar["gunluk_calisma_saati"] = self.ayar_saat.text.strip() or "7.5"
+        self.ayarlar["mesai_katsayi"] = self.ayar_katsayi.text.strip() or "1.5"
+
+        if self.ayar_tatil.text in HAFTA_GUNLERI:
+            self.ayarlar["hafta_tatili_gunu"] = self.ayar_tatil.text
+        else:
+            self.ayarlar["hafta_tatili_gunu"] = "Pazar"
+
+        self.ayarlari_yaz()
+
+        self.ayar_bilgisi_guncelle()
+        self.kayit_onizleme_guncelle()
+        self.kayitlari_listele()
+        self.ozet_goster()
+
+        self.mesaj_goster("Kaydedildi", "Ayarlar kaydedildi.")
 
     def gunluk_ucret(self, maas=None):
         if maas is None:
@@ -661,489 +727,6 @@ class MaasTakipApp(App):
 
         return 0.0
 
-    def show_ayarlar(self):
-        self.temizle()
-
-        ana = BoxLayout(
-            orientation="vertical",
-            spacing=dp(8)
-        )
-
-        ana.add_widget(
-            self.ekran_baslik(
-                "Ayarlar",
-                "Maaşı bir kere yaz, uygulama bütün hesabı ona göre yapsın."
-            )
-        )
-
-        kart = self.kart(orientation="vertical")
-
-        form = GridLayout(
-            cols=2,
-            spacing=dp(7),
-            padding=dp(2),
-            size_hint_y=None
-        )
-        form.bind(minimum_height=form.setter("height"))
-
-        self.ayar_maas = self.input_satiri(
-            form,
-            "Aylık maaş",
-            self.ayarlar.get("aylik_maas", "0"),
-            "Örn: 35000"
-        )
-
-        self.ayar_gunluk_saat = self.input_satiri(
-            form,
-            "Günlük çalışma saati",
-            self.ayarlar.get("gunluk_calisma_saati", "7.5"),
-            "Örn: 7.5"
-        )
-
-        self.ayar_mesai_katsayi = self.input_satiri(
-            form,
-            "Mesai katsayısı",
-            self.ayarlar.get("mesai_katsayi", "1.5"),
-            "Örn: 1.5"
-        )
-
-        self.ayar_hafta_tatili = self.spinner_satiri(
-            form,
-            "Hafta tatilin",
-            self.ayarlar.get("hafta_tatili_gunu", "Pazar"),
-            list(HAFTA_GUNLERI.keys())
-        )
-
-        kart.add_widget(form)
-
-        self.ayar_bilgi = Label(
-            text="",
-            color=RENK_SOLUK_YAZI,
-            font_size=dp(14),
-            size_hint_y=None,
-            height=dp(78),
-            halign="left",
-            valign="top"
-        )
-        self.ayar_bilgi.bind(width=self.label_genislik_ayarla)
-        kart.add_widget(self.ayar_bilgi)
-
-        btn_satir = BoxLayout(
-            orientation="horizontal",
-            size_hint_y=None,
-            height=dp(52),
-            spacing=dp(8)
-        )
-
-        kaydet = ModernButon(
-            text="Ayarları Kaydet",
-            bg_color=RENK_YESIL,
-            bg_down_color=RENK_YESIL_KOYU
-        )
-        kaydet.bind(on_press=self.ayarlari_kaydet)
-
-        hesapla = ModernButon(
-            text="Hesabı Göster",
-            bg_color=RENK_MAVI,
-            bg_down_color=RENK_MAVI_KOYU
-        )
-        hesapla.bind(on_press=lambda x: self.ayar_bilgisi_guncelle())
-
-        btn_satir.add_widget(kaydet)
-        btn_satir.add_widget(hesapla)
-        kart.add_widget(btn_satir)
-
-        ana.add_widget(kart)
-        self.content.addf.label_genislik_ayarla)
-
-        alt_baslik = Label(
-            text="Aylık maaşa göre mesai, tatil, prim, avans ve kesinti hesabı",
-            color=RENK_SOLUK_YAZI,
-            font_size=dp(13),
-            halign="left",
-            valign="middle"
-        )
-        alt_baslik.bind(width=self.label_genislik_ayarla)
-
-        ust_kart.add_widget(baslik)
-        ust_kart.add_widget(alt_baslik)
-        ana.add_widget(ust_kart)
-
-        maas_kart = YuvarlakKutu(
-            orientation="vertical",
-            padding=dp(10),
-            spacing=dp(7),
-            bg_color=RENK_KART_2,
-            radius=20,
-            size_hint_y=None,
-            height=dp(122)
-        )
-
-        maas_baslik = Label(
-            text="Aylık Maaş",
-            color=RENK_YAZI,
-            font_size=dp(18),
-            bold=True,
-            size_hint_y=None,
-            height=dp(28),
-            halign="left",
-            valign="middle"
-        )
-        maas_baslik.bind(width=self.label_genislik_ayarla)
-
-        self.aylik_maas = ModernInput(
-            text=varsayilan_maas,
-            hint_text="Örn: 35000",
-            size_hint_y=None,
-            height=dp(45)
-        )
-
-        self.maas_bilgi = Label(
-            text="Günlük: 0,00 TL | Saatlik: 0,00 TL",
-            color=RENK_SOLUK_YAZI,
-            font_size=dp(13),
-            size_hint_y=None,
-            height=dp(24),
-            halign="left",
-            valign="middle"
-        )
-        self.maas_bilgi.bind(width=self.label_genislik_ayarla)
-
-        self.aylik_maas.bind(text=self.maas_bilgisi_guncelle)
-
-        maas_kart.add_widget(maas_baslik)
-        maas_kart.add_widget(self.aylik_maas)
-        maas_kart.add_widget(self.maas_bilgi)
-        ana.add_widget(maas_kart)
-
-        form_kart = YuvarlakKutu(
-            orientation="vertical",
-            padding=dp(10),
-            spacing=dp(8),
-            bg_color=RENK_KART,
-            radius=22,
-            size_hint_y=0.44
-        )
-
-        form_baslik = Label(
-            text="Yeni Kayıt",
-            color=RENK_YAZI,
-            font_size=dp(18),
-            bold=True,
-            size_hint_y=None,
-            height=dp(28),
-            halign="left",
-            valign="middle"
-        )
-        form_baslik.bind(width=self.label_genislik_ayarla)
-        form_kart.add_widget(form_baslik)
-
-        form_scroll = ScrollView()
-
-        form = GridLayout(
-            cols=2,
-            spacing=dp(7),
-            padding=dp(2),
-            size_hint_y=None
-        )
-        form.bind(minimum_height=form.setter("height"))
-
-        self.tarih = self.input_ekle(form, "Tarih", bugunun_tarihi())
-
-        self.hafta_tatili_gunu = self.spinner_ekle(
-            form,
-            "Hafta tatilin",
-            varsayilan_hafta_tatili,
-            list(HAFTA_GUNLERI.keys())
-        )
-
-        self.gun_turu_secim = self.spinner_ekle(
-            form,
-            "Gün türü",
-            "Otomatik",
-            GUN_TURU_SECENEKLERI
-        )
-
-        self.calisma_durumu = self.spinner_ekle(
-            form,
-            "Durum",
-            "Çalıştım",
-            CALISMA_SECENEKLERI
-        )
-
-        self.mesai_saat = self.input_ekle(form, "Ek mesai saati", "0")
-        self.mesai_katsayi = self.input_ekle(form, "Mesai katsayısı", varsayilan_katsayi)
-        self.prim = self.input_ekle(form, "Prim", "0")
-        self.avans = self.input_ekle(form, "Avans", "0")
-        self.kesinti = self.input_ekle(form, "Kesinti", "0")
-        self.aciklama = self.input_ekle(form, "Açıklama", "")
-
-        form_scroll.add_widget(form)
-        form_kart.add_widget(form_scroll)
-        ana.add_widget(form_kart)
-
-        butonlar_1 = BoxLayout(
-            orientation="horizontal",
-            size_hint_y=None,
-            height=dp(52),
-            spacing=dp(8)
-        )
-
-        kaydet_btn = ModernButon(
-            text="Kaydet",
-            bg_color=RENK_YESIL,
-            bg_down_color=RENK_YESIL_KOYU
-        )
-        kaydet_btn.bind(on_press=self.kaydet)
-
-        hesap_btn = ModernButon(
-            text="Hesapla",
-            bg_color=RENK_MAVI,
-            bg_down_color=RENK_MAVI_KOYU
-        )
-        hesap_btn.bind(on_press=self.anlik_hesap_goster)
-
-        butonlar_1.add_widget(kaydet_btn)
-        butonlar_1.add_widget(hesap_btn)
-        ana.add_widget(butonlar_1)
-
-        filtre_satiri = BoxLayout(
-            orientation="horizontal",
-            size_hint_y=None,
-            height=dp(48),
-            spacing=dp(7)
-        )
-
-        self.ay_filtre = ModernInput(
-            text=bu_ay(),
-            hint_text="Ay: 04.2026"
-        )
-
-        filtre_btn = ModernButon(
-            text="Ayı Göster",
-            bg_color=RENK_TURUNCU,
-            bg_down_color=[0.75, 0.38, 0.08, 1]
-        )
-        filtre_btn.bind(on_press=self.kayitlari_goster)
-
-        temizle_btn = ModernButon(
-            text="Tümü",
-            bg_color=RENK_KART_2,
-            bg_down_color=[0.18, 0.24, 0.36, 1]
-        )
-        temizle_btn.bind(on_press=self.filtre_temizle)
-
-        filtre_satiri.add_widget(self.ay_filtre)
-        filtre_satiri.add_widget(filtre_btn)
-        filtre_satiri.add_widget(temizle_btn)
-        ana.add_widget(filtre_satiri)
-
-        sil_satiri = BoxLayout(
-            orientation="horizontal",
-            size_hint_y=None,
-            height=dp(48),
-            spacing=dp(7)
-        )
-
-        self.silinecek_no = ModernInput(
-            text="",
-            hint_text="Silinecek no",
-            input_filter="int"
-        )
-
-        sil_btn = ModernButon(
-            text="Kaydı Sil",
-            bg_color=RENK_KIRMIZI,
-            bg_down_color=RENK_KIRMIZI_KOYU
-        )
-        sil_btn.bind(on_press=self.kaydi_sil)
-
-        sil_satiri.add_widget(self.silinecek_no)
-        sil_satiri.add_widget(sil_btn)
-        ana.add_widget(sil_satiri)
-
-        ozet_kart = YuvarlakKutu(
-            orientation="vertical",
-            padding=dp(10),
-            spacing=dp(4),
-            bg_color=RENK_KART_2,
-            radius=20,
-            size_hint_y=None,
-            height=dp(128)
-        )
-
-        ozet_baslik = Label(
-            text="Özet",
-            color=RENK_YAZI,
-            font_size=dp(17),
-            bold=True,
-            size_hint_y=None,
-            height=dp(24),
-            halign="left",
-            valign="middle"
-        )
-        ozet_baslik.bind(width=self.label_genislik_ayarla)
-
-        self.sonuc = Label(
-            text="Hazır.",
-            color=RENK_SOLUK_YAZI,
-            font_size=dp(13),
-            halign="left",
-            valign="top"
-        )
-        self.sonuc.bind(width=self.label_genislik_ayarla)
-
-        ozet_kart.add_widget(ozet_baslik)
-        ozet_kart.add_widget(self.sonuc)
-        ana.add_widget(ozet_kart)
-
-        kayit_kart = YuvarlakKutu(
-            orientation="vertical",
-            padding=dp(10),
-            spacing=dp(6),
-            bg_color=RENK_KART,
-            radius=22,
-            size_hint_y=0.56
-        )
-
-        kayit_baslik = Label(
-            text="Kayıtlar",
-            color=RENK_YAZI,
-            size_hint_y=None,
-            height=dp(30),
-            font_size=dp(18),
-            bold=True,
-            halign="left",
-            valign="middle"
-        )
-        kayit_baslik.bind(width=self.label_genislik_ayarla)
-        kayit_kart.add_widget(kayit_baslik)
-
-        self.kayit_scroll = ScrollView()
-
-        self.kayit_label = Label(
-            text="",
-            size_hint_y=None,
-            color=RENK_YAZI,
-            halign="left",
-            valign="top",
-            font_size=dp(13)
-        )
-        self.kayit_label.bind(width=self.label_genislik_ayarla)
-        self.kayit_label.bind(texture_size=self.kayit_yukseklik_ayarla)
-
-        self.kayit_scroll.add_widget(self.kayit_label)
-        kayit_kart.add_widget(self.kayit_scroll)
-        ana.add_widget(kayit_kart)
-
-        self.gorunen_indeksler = []
-        self.maas_bilgisi_guncelle()
-        self.kayitlari_goster()
-
-        return ana
-
-    def label_genislik_ayarla(self, instance, width):
-        instance.text_size = (width, None)
-
-    def kayit_yukseklik_ayarla(self, instance, texture_size):
-        instance.height = texture_size[1] + dp(20)
-
-    def input_ekle(self, form, baslik, varsayilan):
-        lbl = Label(
-            text=baslik,
-            size_hint_y=None,
-            height=dp(42),
-            color=RENK_SOLUK_YAZI,
-            font_size=dp(13),
-            halign="left",
-            valign="middle"
-        )
-        lbl.bind(width=self.label_genislik_ayarla)
-
-        inp = ModernInput(
-            text=str(varsayilan),
-            size_hint_y=None,
-            height=dp(42)
-        )
-
-        form.add_widget(lbl)
-        form.add_widget(inp)
-
-        return inp
-
-    def spinner_ekle(self, form, baslik, varsayilan, secenekler):
-        lbl = Label(
-            text=baslik,
-            size_hint_y=None,
-            height=dp(42),
-            color=RENK_SOLUK_YAZI,
-            font_size=dp(13),
-            halign="left",
-            valign="middle"
-        )
-        lbl.bind(width=self.label_genislik_ayarla)
-
-        spn = ModernSpinner(
-            text=varsayilan,
-            values=secenekler,
-            size_hint_y=None,
-            height=dp(42)
-        )
-
-        form.add_widget(lbl)
-        form.add_widget(spn)
-
-        return spn
-
-    def maas_bilgisi_guncelle(self, *args):
-        maas = sayiya_cevir(self.aylik_maas.text)
-        gunluk = maas / 30 if maas > 0 else 0
-        saatlik = maas / 225 if maas > 0 else 0
-
-        self.maas_bilgi.text = (
-            f"Günlük: {para_yaz(gunluk)} | Saatlik: {para_yaz(saatlik)}"
-        )
-
-    def mesaj_goster(self, baslik, mesaj):
-        kutu = YuvarlakKutu(
-            orientation="vertical",
-            padding=dp(14),
-            spacing=dp(12),
-            bg_color=RENK_KART,
-            radius=20
-        )
-
-        yazi = Label(
-            text=mesaj,
-            color=RENK_YAZI,
-            font_size=dp(15),
-            halign="center",
-            valign="middle"
-        )
-        yazi.bind(width=self.label_genislik_ayarla)
-
-        kapat_btn = ModernButon(
-            text="Tamam",
-            size_hint_y=None,
-            height=dp(46),
-            bg_color=RENK_MAVI,
-            bg_down_color=RENK_MAVI_KOYU
-        )
-
-        kutu.add_widget(yazi)
-        kutu.add_widget(kapat_btn)
-
-        popup = Popup(
-            title=baslik,
-            content=kutu,
-            size_hint=(0.88, 0.42),
-            background_color=[0.05, 0.07, 0.11, 1],
-            separator_color=RENK_MAVI,
-            title_color=RENK_YAZI
-        )
-        kapat_btn.bind(on_press=popup.dismiss)
-        popup.open()
-
     def dosyayi_hazirla_ve_duzelt(self):
         if not os.path.exists(self.dosya_yolu):
             self.kayitlari_yaz([])
@@ -1151,49 +734,82 @@ class MaasTakipApp(App):
 
         try:
             with open(self.dosya_yolu, "r", newline="", encoding="utf-8") as f:
-                okuyucu = csv.DictReader(f)
-                eski_kayitlar = list(okuyucu)
+                eski = list(csv.DictReader(f))
         except Exception:
-            eski_kayitlar = []
+            eski = []
 
-        duzeltilmis_kayitlar = []
+        duzeltilmis = []
 
-        for kayit in eski_kayitlar:
-            duzeltilmis_kayitlar.append(self.kaydi_duzelt(kayit))
+        for kayit in eski:
+            if kayit:
+                duzeltilmis.append(self.kaydi_duzelt(kayit))
 
-        self.kayitlari_yaz(duzeltilmis_kayitlar)
+        self.kayitlari_yaz(duzeltilmis)
 
     def kaydi_duzelt(self, kayit):
-        yeni = {}
-
-        tarih = kayit.get("tarih") or kayit.get("Tarih") or bugunun_tarihi()
-
         eski_gunluk = sayiya_cevir(kayit.get("gunluk_ucret", "0"))
-        eski_aylik = sayiya_cevir(kayit.get("aylik_maas", "0"))
+        eski_aylik = sayiya_cevir(
+            kayit.get(
+                "aylik_maas_snapshot",
+                kayit.get("aylik_maas", "0"),
+            )
+        )
 
         if eski_aylik <= 0 and eski_gunluk > 0:
             eski_aylik = eski_gunluk * 30
 
-        yeni["tarih"] = tarih
-        yeni["aylik_maas"] = kayit.get("aylik_maas", f"{eski_aylik:.2f}")
-        yeni["hafta_tatili_gunu"] = kayit.get("hafta_tatili_gunu", "Pazar")
-        yeni["gun_turu_secim"] = kayit.get("gun_turu_secim", "Otomatik")
-        yeni["calisma_durumu"] = kayit.get("calisma_durumu", "Çalıştım")
-        yeni["mesai_saat"] = kayit.get("mesai_saat", "0")
-        yeni["mesai_katsayi"] = kayit.get("mesai_katsayi", "1.5")
-        yeni["prim"] = kayit.get("prim", "0")
-        yeni["avans"] = kayit.get("avans", "0")
-        yeni["kesinti"] = kayit.get("kesinti", "0")
-        yeni["aciklama"] = kayit.get("aciklama", "")
+        if eski_aylik <= 0:
+            eski_aylik = sayiya_cevir(self.ayarlar.get("aylik_maas", "0"))
 
-        gun_turu, tatil_adi, tatil_orani = gun_turu_hesapla(
-            yeni["tarih"],
-            yeni["hafta_tatili_gunu"],
-            yeni["gun_turu_secim"]
+        tarih = kayit.get("tarih") or kayit.get("Tarih") or bugunun_tarihi()
+
+        hafta_tatili = kayit.get(
+            "hafta_tatili_gunu_snapshot",
+            kayit.get(
+                "hafta_tatili_gunu",
+                self.ayarlar.get("hafta_tatili_gunu", "Pazar"),
+            ),
         )
 
-        yeni["gun_turu"] = kayit.get("gun_turu", gun_turu)
-        yeni["tatil_adi"] = kayit.get("tatil_adi", tatil_adi)
+        if hafta_tatili not in HAFTA_GUNLERI:
+            hafta_tatili = "Pazar"
+
+        gun_turu_secim = kayit.get("gun_turu_secim", "Otomatik")
+
+        if gun_turu_secim not in GUN_TURU_SECENEKLERI:
+            gun_turu_secim = "Otomatik"
+
+        gun_turu, tatil_adi, oran = gun_turu_hesapla(
+            tarih,
+            hafta_tatili,
+            gun_turu_secim,
+        )
+
+        yeni = {
+            "tarih": tarih,
+            "aylik_maas_snapshot": kayit.get("aylik_maas_snapshot", f"{eski_aylik:.2f}"),
+            "gunluk_calisma_saati_snapshot": kayit.get(
+                "gunluk_calisma_saati_snapshot",
+                self.ayarlar.get("gunluk_calisma_saati", "7.5"),
+            ),
+            "hafta_tatili_gunu_snapshot": hafta_tatili,
+            "mesai_katsayi_snapshot": kayit.get(
+                "mesai_katsayi_snapshot",
+                kayit.get(
+                    "mesai_katsayi",
+                    self.ayarlar.get("mesai_katsayi", "1.5"),
+                ),
+            ),
+            "gun_turu_secim": gun_turu_secim,
+            "gun_turu": kayit.get("gun_turu", gun_turu),
+            "tatil_adi": kayit.get("tatil_adi", tatil_adi),
+            "calisma_durumu": kayit.get("calisma_durumu", "Çalıştım"),
+            "mesai_saat": kayit.get("mesai_saat", "0"),
+            "prim": kayit.get("prim", "0"),
+            "avans": kayit.get("avans", "0"),
+            "kesinti": kayit.get("kesinti", "0"),
+            "aciklama": kayit.get("aciklama", ""),
+        }
 
         tatil_ek, mesai_ucret, toplam_ek = self.hesapla_kayittan(yeni)
 
@@ -1203,29 +819,6 @@ class MaasTakipApp(App):
 
         return yeni
 
-    def son_ayarlari_getir(self):
-        kayitlar = self.kayitlari_oku()
-
-        if not kayitlar:
-            return "0", "1.5", "Pazar"
-
-        son = kayitlar[-1]
-
-        maas = son.get("aylik_maas", "0")
-        katsayi = son.get("mesai_katsayi", "1.5")
-        hafta_tatili = son.get("hafta_tatili_gunu", "Pazar")
-
-        if str(maas).strip() == "":
-            maas = "0"
-
-        if str(katsayi).strip() == "":
-            katsayi = "1.5"
-
-        if hafta_tatili not in HAFTA_GUNLERI:
-            hafta_tatili = "Pazar"
-
-        return maas, katsayi, hafta_tatili
-
     def kayitlari_oku(self):
         if not os.path.exists(self.dosya_yolu):
             return []
@@ -1233,13 +826,7 @@ class MaasTakipApp(App):
         try:
             with open(self.dosya_yolu, "r", newline="", encoding="utf-8") as f:
                 okuyucu = csv.DictReader(f)
-                kayitlar = []
-
-                for kayit in okuyucu:
-                    if kayit:
-                        kayitlar.append(self.kaydi_duzelt(kayit))
-
-                return kayitlar
+                return [self.kaydi_duzelt(kayit) for kayit in okuyucu if kayit]
         except Exception:
             return []
 
@@ -1257,26 +844,32 @@ class MaasTakipApp(App):
                 yazici.writerow(temiz)
 
     def hesapla_formdan(self):
-        gun_turu, tatil_adi, tatil_orani = gun_turu_hesapla(
-            self.tarih.text,
-            self.hafta_tatili_gunu.text,
-            self.gun_turu_secim.text
+        maas = self.ayarlar.get("aylik_maas", "0")
+        saat = self.ayarlar.get("gunluk_calisma_saati", "7.5")
+        hafta = self.ayarlar.get("hafta_tatili_gunu", "Pazar")
+        katsayi = self.ayarlar.get("mesai_katsayi", "1.5")
+
+        gun_turu, tatil_adi, oran = gun_turu_hesapla(
+            self.kayit_tarih.text,
+            hafta,
+            self.kayit_gun_turu.text,
         )
 
         kayit = {
-            "tarih": self.tarih.text,
-            "aylik_maas": self.aylik_maas.text,
-            "hafta_tatili_gunu": self.hafta_tatili_gunu.text,
-            "gun_turu_secim": self.gun_turu_secim.text,
+            "tarih": self.kayit_tarih.text.strip() or bugunun_tarihi(),
+            "aylik_maas_snapshot": maas,
+            "gunluk_calisma_saati_snapshot": saat,
+            "hafta_tatili_gunu_snapshot": hafta,
+            "mesai_katsayi_snapshot": katsayi,
+            "gun_turu_secim": self.kayit_gun_turu.text,
             "gun_turu": gun_turu,
             "tatil_adi": tatil_adi,
-            "calisma_durumu": self.calisma_durumu.text,
-            "mesai_saat": self.mesai_saat.text,
-            "mesai_katsayi": self.mesai_katsayi.text,
-            "prim": self.prim.text,
-            "avans": self.avans.text,
-            "kesinti": self.kesinti.text,
-            "aciklama": self.aciklama.text,
+            "calisma_durumu": self.kayit_calisma.text,
+            "mesai_saat": self.kayit_mesai.text,
+            "prim": self.kayit_prim.text,
+            "avans": self.kayit_avans.text,
+            "kesinti": self.kayit_kesinti.text,
+            "aciklama": self.kayit_aciklama.text,
         }
 
         tatil_ek, mesai_ucret, toplam_ek = self.hesapla_kayittan(kayit)
@@ -1288,12 +881,31 @@ class MaasTakipApp(App):
         return kayit, tatil_ek, mesai_ucret, toplam_ek
 
     def hesapla_kayittan(self, kayit):
-        maas = sayiya_cevir(kayit.get("aylik_maas", "0"))
-        gunluk = maas / 30 if maas > 0 else 0
-        saatlik = maas / 225 if maas > 0 else 0
+        maas = sayiya_cevir(
+            kayit.get(
+                "aylik_maas_snapshot",
+                self.ayarlar.get("aylik_maas", "0"),
+            )
+        )
+
+        gunluk_saat = sayiya_cevir(
+            kayit.get(
+                "gunluk_calisma_saati_snapshot",
+                self.ayarlar.get("gunluk_calisma_saati", "7.5"),
+            )
+        )
+
+        katsayi = sayiya_cevir(
+            kayit.get(
+                "mesai_katsayi_snapshot",
+                self.ayarlar.get("mesai_katsayi", "1.5"),
+            )
+        )
+
+        gunluk = maas / 30 if maas > 0 else 0.0
+        saatlik = gunluk / gunluk_saat if gunluk > 0 and gunluk_saat > 0 else 0.0
 
         mesai_saat = sayiya_cevir(kayit.get("mesai_saat", "0"))
-        mesai_katsayi = sayiya_cevir(kayit.get("mesai_katsayi", "1.5"))
         prim = sayiya_cevir(kayit.get("prim", "0"))
         avans = sayiya_cevir(kayit.get("avans", "0"))
         kesinti = sayiya_cevir(kayit.get("kesinti", "0"))
@@ -1311,72 +923,73 @@ class MaasTakipApp(App):
             elif gun_turu == "Hafta Tatili":
                 tatil_ek = gunluk * 1.5
 
-        mesai_ucret = mesai_saat * saatlik * mesai_katsayi
+        mesai_ucret = mesai_saat * saatlik * katsayi
         toplam_ek = tatil_ek + mesai_ucret + prim - avans - kesinti
 
         return tatil_ek, mesai_ucret, toplam_ek
 
-    def anlik_hesap_goster(self, instance=None):
+    def kayit_onizleme_guncelle(self):
+        if not hasattr(self, "kayit_tarih"):
+            return
+
         kayit, tatil_ek, mesai_ucret, toplam_ek = self.hesapla_formdan()
 
-        maas = sayiya_cevir(kayit.get("aylik_maas", "0"))
-        gunluk = maas / 30 if maas > 0 else 0
-        saatlik = maas / 225 if maas > 0 else 0
-
-        self.mesaj_goster(
-            "Anlık Hesap",
-            f"Gün türü: {kayit['gun_turu']}\n"
-            f"Detay: {kayit['tatil_adi']}\n"
-            f"Günlük: {para_yaz(gunluk)}\n"
-            f"Saatlik: {para_yaz(saatlik)}\n"
-            f"Tatil ek ücreti: {para_yaz(tatil_ek)}\n"
-            f"Mesai ücreti: {para_yaz(mesai_ucret)}\n"
-            f"Bu kaydın etkisi: {para_yaz(toplam_ek)}"
+        gunluk = self.gunluk_ucret(kayit.get("aylik_maas_snapshot"))
+        saatlik = self.saatlik_ucret(
+            kayit.get("aylik_maas_snapshot"),
+            kayit.get("gunluk_calisma_saati_snapshot"),
         )
 
-    def kaydet(self, instance):
-        kayit, tatil_ek, mesai_ucret, toplam_ek = self.hesapla_formdan()
+        self.kayit_onizleme.text = (
+            f"Gün türü: {kayit.get('gun_turu', '')} | {kayit.get('tatil_adi', '')}\n"
+            f"Günlük: {para_yaz(gunluk)} | Saatlik: {para_yaz(saatlik)}\n"
+            f"Tatil ek: {para_yaz(tatil_ek)} | Mesai: {para_yaz(mesai_ucret)}\n"
+            f"Bu kaydın maaşa etkisi: {para_yaz(toplam_ek)}"
+        )
 
-        if str(kayit["tarih"]).strip() == "":
-            kayit["tarih"] = bugunun_tarihi()
+    def kaydet(self, instance=None):
+        if sayiya_cevir(self.ayarlar.get("aylik_maas", "0")) <= 0:
+            self.mesaj_goster(
+                "Maaş eksik",
+                "Önce Ayarlar sekmesinden aylık maaşını yazıp kaydetmelisin.",
+            )
+            return
+
+        kayit, tatil_ek, mesai_ucret, toplam_ek = self.hesapla_formdan()
 
         kayitlar = self.kayitlari_oku()
         kayitlar.append(kayit)
         self.kayitlari_yaz(kayitlar)
 
-        self.mesai_saat.text = "0"
-        self.prim.text = "0"
-        self.avans.text = "0"
-        self.kesinti.text = "0"
-        self.aciklama.text = ""
-        self.tarih.text = bugunun_tarihi()
-        self.gun_turu_secim.text = "Otomatik"
-        self.calisma_durumu.text = "Çalıştım"
+        self.kayit_mesai.text = "0"
+        self.kayit_prim.text = "0"
+        self.kayit_avans.text = "0"
+        self.kayit_kesinti.text = "0"
+        self.kayit_aciklama.text = ""
+        self.kayit_tarih.text = bugunun_tarihi()
+        self.kayit_gun_turu.text = "Otomatik"
+        self.kayit_calisma.text = "Çalıştım"
 
-        self.kayitlari_goster()
+        self.kayit_onizleme_guncelle()
+        self.kayitlari_listele()
+        self.ozet_goster()
 
         self.mesaj_goster(
             "Kaydedildi",
-            f"Gün türü: {kayit['gun_turu']}\n"
-            f"Detay: {kayit['tatil_adi']}\n"
             f"Tatil ek: {para_yaz(tatil_ek)}\n"
             f"Mesai: {para_yaz(mesai_ucret)}\n"
-            f"Bu kaydın etkisi: {para_yaz(toplam_ek)}"
+            f"Maaşa etkisi: {para_yaz(toplam_ek)}",
         )
 
-    def filtre_temizle(self, instance):
-        self.ay_filtre.text = ""
-        self.kayitlari_goster()
-
-    def filtreye_uyuyor_mu(self, kayit):
-        filtre = self.ay_filtre.text.strip()
+    def filtreye_uyuyor_mu(self, kayit, filtre):
+        filtre = str(filtre).strip()
 
         if filtre == "":
             return True
 
-        kayit_ayi = tarih_ay_anahtari(kayit.get("tarih", ""))
+        ay = tarih_ay_anahtari(kayit.get("tarih", ""))
 
-        if filtre == kayit_ayi:
+        if filtre == ay:
             return True
 
         if filtre in str(kayit.get("tarih", "")):
@@ -1384,87 +997,132 @@ class MaasTakipApp(App):
 
         return False
 
-    def kayitlari_goster(self, instance=None):
-        tum_kayitlar = self.kayitlari_oku()
+    def kayitlari_filtrele(self, filtre):
+        tum = self.kayitlari_oku()
+        sonuc = []
 
-        gorunenler = []
+        for i, kayit in enumerate(tum):
+            if self.filtreye_uyuyor_mu(kayit, filtre):
+                sonuc.append((i, kayit))
 
-        for orijinal_indeks, kayit in enumerate(tum_kayitlar):
-            if self.filtreye_uyuyor_mu(kayit):
-                gorunenler.append((orijinal_indeks, kayit))
+        return sonuc
 
-        gorunenler = list(reversed(gorunenler))
-        self.gorunen_indeksler = [indeks for indeks, kayit in gorunenler]
+    def toplamlar(self, kayit_ciftleri):
+        sonuc = {
+            "tatil_ek": 0.0,
+            "mesai": 0.0,
+            "prim": 0.0,
+            "avans": 0.0,
+            "kesinti": 0.0,
+            "toplam_ek": 0.0,
+            "mesai_saat": 0.0,
+        }
 
-        maas = sayiya_cevir(self.aylik_maas.text)
-        gunluk = maas / 30 if maas > 0 else 0
-        saatlik = maas / 225 if maas > 0 else 0
+        for indeks, kayit in kayit_ciftleri:
+            tatil_ek, mesai_ucret, toplam_ek = self.hesapla_kayittan(kayit)
 
-        toplam_tatil_ek = 0.0
-        toplam_mesai_ucret = 0.0
-        toplam_prim = 0.0
-        toplam_avans = 0.0
-        toplam_kesinti = 0.0
-        toplam_ek = 0.0
-        toplam_mesai_saat = 0.0
+            sonuc["tatil_ek"] += tatil_ek
+            sonuc["mesai"] += mesai_ucret
+            sonuc["prim"] += sayiya_cevir(kayit.get("prim", "0"))
+            sonuc["avans"] += sayiya_cevir(kayit.get("avans", "0"))
+            sonuc["kesinti"] += sayiya_cevir(kayit.get("kesinti", "0"))
+            sonuc["toplam_ek"] += toplam_ek
+            sonuc["mesai_saat"] += sayiya_cevir(kayit.get("mesai_saat", "0"))
 
-        satirlar = []
+        return sonuc
 
-        for sira, (orijinal_indeks, kayit) in enumerate(gorunenler, start=1):
-            tatil_ek, mesai_ucret, kayit_toplam_ek = self.hesapla_kayittan(kayit)
+    def kayitlari_listele(self):
+        if not hasattr(self, "kayitlar_ay"):
+            return
 
-            mesai_saat = sayiya_cevir(kayit.get("mesai_saat", "0"))
-            prim = sayiya_cevir(kayit.get("prim", "0"))
-            avans = sayiya_cevir(kayit.get("avans", "0"))
-            kesinti = sayiya_cevir(kayit.get("kesinti", "0"))
-            aciklama = str(kayit.get("aciklama", "")).strip()
+        filtre = self.kayitlar_ay.text.strip()
 
-            toplam_tatil_ek += tatil_ek
-            toplam_mesai_ucret += mesai_ucret
-            toplam_prim += prim
-            toplam_avans += avans
-            toplam_kesinti += kesinti
-            toplam_ek += kayit_toplam_ek
-            toplam_mesai_saat += mesai_saat
+        ciftler = self.kayitlari_filtrele(filtre)
+        ciftler_ters = list(reversed(ciftler))
 
-            aciklama_satiri = ""
-            if aciklama:
-                aciklama_satiri = f"\nNot: {aciklama}"
+        self.gorunen_indeksler = [i for i, kayit in ciftler_ters]
 
-            satirlar.append(
-                f"{sira}) {kayit.get('tarih', '')} | {kayit.get('gun_turu', '')}\n"
-                f"Detay: {kayit.get('tatil_adi', '')}\n"
-                f"Durum: {kayit.get('calisma_durumu', '')} | Mesai: {mesai_saat:g} saat\n"
-                f"Tatil ek: {para_yaz(tatil_ek)} | Mesai: {para_yaz(mesai_ucret)}\n"
-                f"Prim: {para_yaz(prim)} | Avans: {para_yaz(avans)} | Kesinti: {para_yaz(kesinti)}\n"
-                f"Kayıt etkisi: {para_yaz(kayit_toplam_ek)}"
-                f"{aciklama_satiri}\n"
-                f"------------------------------\n"
-            )
+        top = self.toplamlar(ciftler)
 
-        filtre = self.ay_filtre.text.strip()
+        maas = sayiya_cevir(self.ayarlar.get("aylik_maas", "0"))
+        tahmini = maas + top["toplam_ek"]
 
         if filtre:
             baslik = f"Ay: {filtre}"
         else:
             baslik = "Tüm kayıtlar"
 
-        tahmini_toplam = maas + toplam_ek
-
-        self.sonuc.text = (
-            f"{baslik} | Kayıt: {len(gorunenler)}\n"
-            f"Aylık maaş: {para_yaz(maas)} | Günlük: {para_yaz(gunluk)} | Saatlik: {para_yaz(saatlik)}\n"
-            f"Tatil ek: {para_yaz(toplam_tatil_ek)} | Mesai: {para_yaz(toplam_mesai_ucret)} | Saat: {toplam_mesai_saat:g}\n"
-            f"Prim: {para_yaz(toplam_prim)} | Avans: {para_yaz(toplam_avans)} | Kesinti: {para_yaz(toplam_kesinti)}\n"
-            f"TAHMİNİ TOPLAM: {para_yaz(tahmini_toplam)}"
+        self.kayitlar_ozet.text = (
+            f"{baslik} | Kayıt: {len(ciftler)}\n"
+            f"Tatil ek: {para_yaz(top['tatil_ek'])} | Mesai: {para_yaz(top['mesai'])} | Saat: {sayi_yaz(top['mesai_saat'])}\n"
+            f"Prim: {para_yaz(top['prim'])} | Avans: {para_yaz(top['avans'])} | Kesinti: {para_yaz(top['kesinti'])}\n"
+            f"Tahmini toplam: {para_yaz(tahmini)}"
         )
+
+        satirlar = []
+
+        for sira, (orijinal_indeks, kayit) in enumerate(ciftler_ters, start=1):
+            tatil_ek, mesai_ucret, kayit_toplam = self.hesapla_kayittan(kayit)
+
+            aciklama = str(kayit.get("aciklama", "")).strip()
+
+            if aciklama:
+                not_satiri = f"\nNot: {aciklama}"
+            else:
+                not_satiri = ""
+
+            satirlar.append(
+                f"{sira}) {kayit.get('tarih', '')} | {kayit.get('gun_turu', '')}\n"
+                f"Detay: {kayit.get('tatil_adi', '')}\n"
+                f"Durum: {kayit.get('calisma_durumu', '')} | Mesai: {sayi_yaz(kayit.get('mesai_saat', '0'))} saat\n"
+                f"Tatil ek: {para_yaz(tatil_ek)} | Mesai: {para_yaz(mesai_ucret)}\n"
+                f"Prim: {para_yaz(kayit.get('prim', '0'))} | Avans: {para_yaz(kayit.get('avans', '0'))} | Kesinti: {para_yaz(kayit.get('kesinti', '0'))}\n"
+                f"Kayıt etkisi: {para_yaz(kayit_toplam)}{not_satiri}\n"
+                f"------------------------------\n"
+            )
 
         if satirlar:
             self.kayit_label.text = "\n".join(satirlar)
         else:
             self.kayit_label.text = "Bu filtrede kayıt yok."
 
-    def kaydi_sil(self, instance):
+    def kayitlar_tumunu_goster(self, instance=None):
+        self.kayitlar_ay.text = ""
+        self.kayitlari_listele()
+
+    def ozet_goster(self):
+        if not hasattr(self, "ozet_ay"):
+            return
+
+        filtre = self.ozet_ay.text.strip()
+
+        ciftler = self.kayitlari_filtrele(filtre)
+        top = self.toplamlar(ciftler)
+
+        maas = sayiya_cevir(self.ayarlar.get("aylik_maas", "0"))
+        tahmini = maas + top["toplam_ek"]
+
+        if filtre:
+            baslik = f"{filtre} Maaş Özeti"
+        else:
+            baslik = "Genel Maaş Özeti"
+
+        self.ozet_label.text = (
+            f"{baslik}\n\n"
+            f"Aylık maaş: {para_yaz(maas)}\n"
+            f"Günlük ücret: {para_yaz(self.gunluk_ucret())}\n"
+            f"Saatlik ücret: {para_yaz(self.saatlik_ucret())}\n\n"
+            f"Kayıt sayısı: {len(ciftler)}\n"
+            f"Toplam mesai saati: {sayi_yaz(top['mesai_saat'])}\n"
+            f"Tatil / hafta tatili ek ücreti: {para_yaz(top['tatil_ek'])}\n"
+            f"Fazla mesai ücreti: {para_yaz(top['mesai'])}\n"
+            f"Prim: {para_yaz(top['prim'])}\n"
+            f"Avans: -{para_yaz(top['avans'])}\n"
+            f"Kesinti: -{para_yaz(top['kesinti'])}\n\n"
+            f"TAHMİNİ TOPLAM: {para_yaz(tahmini)}"
+        )
+
+    def kaydi_sil(self, instance=None):
         no_metni = self.silinecek_no.text.strip()
 
         if no_metni == "":
@@ -1481,24 +1139,26 @@ class MaasTakipApp(App):
             self.mesaj_goster("Bulunamadı", "Bu numarada görünen bir kayıt yok.")
             return
 
-        tum_kayitlar = self.kayitlari_oku()
-        silinecek_orijinal_indeks = self.gorunen_indeksler[no - 1]
+        tum = self.kayitlari_oku()
+        silinecek = self.gorunen_indeksler[no - 1]
 
-        if silinecek_orijinal_indeks < 0 or silinecek_orijinal_indeks >= len(tum_kayitlar):
+        if silinecek < 0 or silinecek >= len(tum):
             self.mesaj_goster("Hata", "Kayıt bulunamadı.")
             return
 
-        silinen = tum_kayitlar.pop(silinecek_orijinal_indeks)
-        self.kayitlari_yaz(tum_kayitlar)
+        silinen = tum.pop(silinecek)
+
+        self.kayitlari_yaz(tum)
 
         self.silinecek_no.text = ""
-        self.kayitlari_goster()
+
+        self.kayitlari_listele()
+        self.ozet_goster()
 
         self.mesaj_goster(
             "Silindi",
             f"Tarih: {silinen.get('tarih', '')}\n"
-            f"Gün türü: {silinen.get('gun_turu', '')}\n"
-            f"Etki: {para_yaz(silinen.get('toplam_ek', '0'))}"
+            f"Etki: {para_yaz(silinen.get('toplam_ek', '0'))}",
         )
 
 
