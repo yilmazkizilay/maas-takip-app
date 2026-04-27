@@ -1,5 +1,6 @@
 import os
 import csv
+import json
 from datetime import datetime
 
 from kivy.app import App
@@ -19,14 +20,15 @@ from kivy.uix.popup import Popup
 
 ALANLAR = [
     "tarih",
-    "aylik_maas",
-    "hafta_tatili_gunu",
+    "aylik_maas_snapshot",
+    "gunluk_calisma_saati_snapshot",
+    "hafta_tatili_gunu_snapshot",
+    "mesai_katsayi_snapshot",
     "gun_turu_secim",
     "gun_turu",
     "tatil_adi",
     "calisma_durumu",
     "mesai_saat",
-    "mesai_katsayi",
     "prim",
     "avans",
     "kesinti",
@@ -48,6 +50,8 @@ RENK_YESIL_KOYU = [0.07, 0.48, 0.28, 1]
 RENK_KIRMIZI = [0.88, 0.20, 0.25, 1]
 RENK_KIRMIZI_KOYU = [0.62, 0.12, 0.16, 1]
 RENK_TURUNCU = [0.95, 0.55, 0.16, 1]
+RENK_MOR = [0.45, 0.28, 0.95, 1]
+RENK_MOR_KOYU = [0.30, 0.18, 0.72, 1]
 
 HAFTA_GUNLERI = {
     "Pazartesi": 0,
@@ -82,8 +86,6 @@ CALISMA_SECENEKLERI = [
     "Çalışmadım",
 ]
 
-# 2026 dini bayram tarihleri ayrıca girildi.
-# Sabit milli/resmi günler her yıl otomatik algılanır.
 RESMI_TATILLER_2026 = {
     "2026-03-19": ("Ramazan Bayramı Arifesi", 0.5),
     "2026-03-20": ("Ramazan Bayramı 1. Gün", 1.0),
@@ -105,6 +107,15 @@ def bu_ay():
     return datetime.now().strftime("%m.%Y")
 
 
+def varsayilan_ayarlar():
+    return {
+        "aylik_maas": "0",
+        "hafta_tatili_gunu": "Pazar",
+        "mesai_katsayi": "1.5",
+        "gunluk_calisma_saati": "7.5",
+    }
+
+
 def sayiya_cevir(deger):
     try:
         if deger is None:
@@ -118,6 +129,15 @@ def sayiya_cevir(deger):
         return float(deger)
     except Exception:
         return 0.0
+
+
+def sayi_yaz(deger):
+    deger = sayiya_cevir(deger)
+
+    if deger == int(deger):
+        return str(int(deger))
+
+    return str(deger).replace(".", ",")
 
 
 def para_yaz(deger):
@@ -166,9 +186,6 @@ def resmi_tatil_bilgisi(tarih):
     if iso in RESMI_TATILLER_2026:
         return RESMI_TATILLER_2026[iso]
 
-    ay = tarih.month
-    gun = tarih.day
-
     sabitler = {
         (1, 1): ("Yılbaşı", 1.0),
         (4, 23): ("23 Nisan Ulusal Egemenlik ve Çocuk Bayramı", 1.0),
@@ -180,7 +197,7 @@ def resmi_tatil_bilgisi(tarih):
         (10, 29): ("29 Ekim Cumhuriyet Bayramı", 1.0),
     }
 
-    return sabitler.get((ay, gun), (None, 0.0))
+    return sabitler.get((tarih.month, tarih.day), (None, 0.0))
 
 
 def gun_turu_hesapla(tarih_metni, hafta_tatili_gunu, gun_turu_secim):
@@ -206,6 +223,7 @@ def gun_turu_hesapla(tarih_metni, hafta_tatili_gunu, gun_turu_secim):
     if tatil_adi:
         if tatil_orani == 0.5:
             return "Yarım Resmi Tatil", tatil_adi, tatil_orani
+
         return "Resmi Tatil", tatil_adi, tatil_orani
 
     hafta_tatili_index = HAFTA_GUNLERI.get(hafta_tatili_gunu, 6)
@@ -258,7 +276,7 @@ class ModernButon(Button):
         self.background_color = [0, 0, 0, 0]
         self.color = RENK_YAZI
         self.bold = True
-        self.font_size = dp(14)
+        self.font_size = dp(13)
 
         with self.canvas.before:
             self.renk = Color(rgba=self.bg_color)
@@ -342,14 +360,15 @@ class ModernInput(TextInput):
 
 class MaasTakipApp(App):
     def build(self):
-        self.title = "Maaş Takip"
+        self.title = "Maaş Takip v0.5"
         Window.clearcolor = RENK_ARKA_PLAN
         Window.softinput_mode = "below_target"
 
         self.dosya_yolu = os.path.join(self.user_data_dir, "maas_kayitlari.csv")
+        self.ayarlar_yolu = os.path.join(self.user_data_dir, "ayarlar.json")
+        self.ayarlar = self.ayarlari_oku()
         self.dosyayi_hazirla_ve_duzelt()
-
-        varsayilan_maas, varsayilan_katsayi, varsayilan_hafta_tatili = self.son_ayarlari_getir()
+        self.gorunen_indeksler = []
 
         ana = YuvarlakKutu(
             orientation="vertical",
@@ -362,22 +381,380 @@ class MaasTakipApp(App):
         ust_kart = YuvarlakKutu(
             orientation="vertical",
             padding=dp(14),
-            spacing=dp(4),
+            spacing=dp(2),
             size_hint_y=None,
-            height=dp(92),
+            height=dp(82),
             bg_color=RENK_KART,
             radius=22
         )
 
         baslik = Label(
-            text="Maaş Takip",
+            text="Maaş Takip v0.5",
             color=RENK_YAZI,
-            font_size=dp(25),
+            font_size=dp(24),
             bold=True,
             halign="left",
             valign="middle"
         )
         baslik.bind(width=self.label_genislik_ayarla)
+
+        alt = Label(
+            text="Ayarlar kaydedilir, kayıtlar maaşa göre otomatik hesaplanır",
+            color=RENK_SOLUK_YAZI,
+            font_size=dp(12),
+            halign="left",
+            valign="middle"
+        )
+        alt.bind(width=self.label_genislik_ayarla)
+
+        ust_kart.add_widget(baslik)
+        ust_kart.add_widget(alt)
+        ana.add_widget(ust_kart)
+
+        nav = BoxLayout(
+            orientation="horizontal",
+            size_hint_y=None,
+            height=dp(48),
+            spacing=dp(6)
+        )
+
+        b_ayar = ModernButon(
+            text="Ayarlar",
+            bg_color=RENK_MOR,
+            bg_down_color=RENK_MOR_KOYU
+        )
+        b_ekle = ModernButon(
+            text="Kayıt Ekle",
+            bg_color=RENK_YESIL,
+            bg_down_color=RENK_YESIL_KOYU
+        )
+        b_kayit = ModernButon(
+            text="Kayıtlar",
+            bg_color=RENK_MAVI,
+            bg_down_color=RENK_MAVI_KOYU
+        )
+        b_ozet = ModernButon(
+            text="Özet",
+            bg_color=RENK_TURUNCU,
+            bg_down_color=[0.75, 0.38, 0.08, 1]
+        )
+
+        b_ayar.bind(on_press=lambda x: self.show_ayarlar())
+        b_ekle.bind(on_press=lambda x: self.show_kayit_ekle())
+        b_kayit.bind(on_press=lambda x: self.show_kayitlar())
+        b_ozet.bind(on_press=lambda x: self.show_ozet())
+
+        nav.add_widget(b_ayar)
+        nav.add_widget(b_ekle)
+        nav.add_widget(b_kayit)
+        nav.add_widget(b_ozet)
+        ana.add_widget(nav)
+
+        self.content = YuvarlakKutu(
+            orientation="vertical",
+            padding=dp(0),
+            spacing=dp(0),
+            bg_color=RENK_ARKA_PLAN,
+            radius=0
+        )
+        ana.add_widget(self.content)
+
+        self.show_ayarlar()
+
+        return ana
+
+    def label_genislik_ayarla(self, instance, width):
+        instance.text_size = (width, None)
+
+    def label_yukseklik_ayarla(self, instance, texture_size):
+        instance.height = texture_size[1] + dp(20)
+
+    def temizle(self):
+        self.content.clear_widgets()
+
+    def kart(self, **kwargs):
+        return YuvarlakKutu(
+            bg_color=RENK_KART,
+            radius=22,
+            padding=dp(12),
+            spacing=dp(8),
+            **kwargs
+        )
+
+    def input_satiri(self, form, baslik, varsayilan, hint=""):
+        lbl = Label(
+            text=baslik,
+            size_hint_y=None,
+            height=dp(42),
+            color=RENK_SOLUK_YAZI,
+            font_size=dp(13),
+            halign="left",
+            valign="middle"
+        )
+        lbl.bind(width=self.label_genislik_ayarla)
+
+        inp = ModernInput(
+            text=str(varsayilan),
+            hint_text=hint,
+            size_hint_y=None,
+            height=dp(42)
+        )
+
+        form.add_widget(lbl)
+        form.add_widget(inp)
+
+        return inp
+
+    def spinner_satiri(self, form, baslik, varsayilan, secenekler):
+        lbl = Label(
+            text=baslik,
+            size_hint_y=None,
+            height=dp(42),
+            color=RENK_SOLUK_YAZI,
+            font_size=dp(13),
+            halign="left",
+            valign="middle"
+        )
+        lbl.bind(width=self.label_genislik_ayarla)
+
+        spn = ModernSpinner(
+            text=varsayilan,
+            values=secenekler,
+            size_hint_y=None,
+            height=dp(42)
+        )
+
+        form.add_widget(lbl)
+        form.add_widget(spn)
+
+        return spn
+
+    def ekran_baslik(self, metin, alt_metin=""):
+        kutu = YuvarlakKutu(
+            orientation="vertical",
+            padding=dp(12),
+            spacing=dp(2),
+            size_hint_y=None,
+            height=dp(70),
+            bg_color=RENK_KART_2,
+            radius=20
+        )
+
+        baslik = Label(
+            text=metin,
+            color=RENK_YAZI,
+            font_size=dp(20),
+            bold=True,
+            halign="left",
+            valign="middle"
+        )
+        baslik.bind(width=self.label_genislik_ayarla)
+        kutu.add_widget(baslik)
+
+        if alt_metin:
+            alt = Label(
+                text=alt_metin,
+                color=RENK_SOLUK_YAZI,
+                font_size=dp(12),
+                halign="left",
+                valign="middle"
+            )
+            alt.bind(width=self.label_genislik_ayarla)
+            kutu.add_widget(alt)
+
+        return kutu
+
+    def mesaj_goster(self, baslik, mesaj):
+        kutu = YuvarlakKutu(
+            orientation="vertical",
+            padding=dp(14),
+            spacing=dp(12),
+            bg_color=RENK_KART,
+            radius=20
+        )
+
+        yazi = Label(
+            text=mesaj,
+            color=RENK_YAZI,
+            font_size=dp(15),
+            halign="center",
+            valign="middle"
+        )
+        yazi.bind(width=self.label_genislik_ayarla)
+
+        kapat_btn = ModernButon(
+            text="Tamam",
+            size_hint_y=None,
+            height=dp(46),
+            bg_color=RENK_MAVI,
+            bg_down_color=RENK_MAVI_KOYU
+        )
+
+        kutu.add_widget(yazi)
+        kutu.add_widget(kapat_btn)
+
+        popup = Popup(
+            title=baslik,
+            content=kutu,
+            size_hint=(0.88, 0.42),
+            background_color=[0.05, 0.07, 0.11, 1],
+            separator_color=RENK_MAVI,
+            title_color=RENK_YAZI
+        )
+        kapat_btn.bind(on_press=popup.dismiss)
+        popup.open()
+
+    def ayarlari_oku(self):
+        ayarlar = varsayilan_ayarlar()
+
+        if os.path.exists(self.ayarlar_yolu):
+            try:
+                with open(self.ayarlar_yolu, "r", encoding="utf-8") as f:
+                    okunan = json.load(f)
+
+                if isinstance(okunan, dict):
+                    ayarlar.update(okunan)
+            except Exception:
+                pass
+
+        if ayarlar.get("hafta_tatili_gunu") not in HAFTA_GUNLERI:
+            ayarlar["hafta_tatili_gunu"] = "Pazar"
+
+        if str(ayarlar.get("mesai_katsayi", "")).strip() == "":
+            ayarlar["mesai_katsayi"] = "1.5"
+
+        if str(ayarlar.get("gunluk_calisma_saati", "")).strip() == "":
+            ayarlar["gunluk_calisma_saati"] = "7.5"
+
+        if str(ayarlar.get("aylik_maas", "")).strip() == "":
+            ayarlar["aylik_maas"] = "0"
+
+        return ayarlar
+
+    def ayarlari_yaz(self):
+        with open(self.ayarlar_yolu, "w", encoding="utf-8") as f:
+            json.dump(self.ayarlar, f, ensure_ascii=False, indent=2)
+
+    def gunluk_ucret(self, maas=None):
+        if maas is None:
+            maas = self.ayarlar.get("aylik_maas", "0")
+
+        maas = sayiya_cevir(maas)
+
+        if maas > 0:
+            return maas / 30
+
+        return 0.0
+
+    def saatlik_ucret(self, maas=None, gunluk_saat=None):
+        if maas is None:
+            maas = self.ayarlar.get("aylik_maas", "0")
+
+        if gunluk_saat is None:
+            gunluk_saat = self.ayarlar.get("gunluk_calisma_saati", "7.5")
+
+        gunluk = self.gunluk_ucret(maas)
+        saat = sayiya_cevir(gunluk_saat)
+
+        if gunluk > 0 and saat > 0:
+            return gunluk / saat
+
+        return 0.0
+
+    def show_ayarlar(self):
+        self.temizle()
+
+        ana = BoxLayout(
+            orientation="vertical",
+            spacing=dp(8)
+        )
+
+        ana.add_widget(
+            self.ekran_baslik(
+                "Ayarlar",
+                "Maaşı bir kere yaz, uygulama bütün hesabı ona göre yapsın."
+            )
+        )
+
+        kart = self.kart(orientation="vertical")
+
+        form = GridLayout(
+            cols=2,
+            spacing=dp(7),
+            padding=dp(2),
+            size_hint_y=None
+        )
+        form.bind(minimum_height=form.setter("height"))
+
+        self.ayar_maas = self.input_satiri(
+            form,
+            "Aylık maaş",
+            self.ayarlar.get("aylik_maas", "0"),
+            "Örn: 35000"
+        )
+
+        self.ayar_gunluk_saat = self.input_satiri(
+            form,
+            "Günlük çalışma saati",
+            self.ayarlar.get("gunluk_calisma_saati", "7.5"),
+            "Örn: 7.5"
+        )
+
+        self.ayar_mesai_katsayi = self.input_satiri(
+            form,
+            "Mesai katsayısı",
+            self.ayarlar.get("mesai_katsayi", "1.5"),
+            "Örn: 1.5"
+        )
+
+        self.ayar_hafta_tatili = self.spinner_satiri(
+            form,
+            "Hafta tatilin",
+            self.ayarlar.get("hafta_tatili_gunu", "Pazar"),
+            list(HAFTA_GUNLERI.keys())
+        )
+
+        kart.add_widget(form)
+
+        self.ayar_bilgi = Label(
+            text="",
+            color=RENK_SOLUK_YAZI,
+            font_size=dp(14),
+            size_hint_y=None,
+            height=dp(78),
+            halign="left",
+            valign="top"
+        )
+        self.ayar_bilgi.bind(width=self.label_genislik_ayarla)
+        kart.add_widget(self.ayar_bilgi)
+
+        btn_satir = BoxLayout(
+            orientation="horizontal",
+            size_hint_y=None,
+            height=dp(52),
+            spacing=dp(8)
+        )
+
+        kaydet = ModernButon(
+            text="Ayarları Kaydet",
+            bg_color=RENK_YESIL,
+            bg_down_color=RENK_YESIL_KOYU
+        )
+        kaydet.bind(on_press=self.ayarlari_kaydet)
+
+        hesapla = ModernButon(
+            text="Hesabı Göster",
+            bg_color=RENK_MAVI,
+            bg_down_color=RENK_MAVI_KOYU
+        )
+        hesapla.bind(on_press=lambda x: self.ayar_bilgisi_guncelle())
+
+        btn_satir.add_widget(kaydet)
+        btn_satir.add_widget(hesapla)
+        kart.add_widget(btn_satir)
+
+        ana.add_widget(kart)
+        self.content.addf.label_genislik_ayarla)
 
         alt_baslik = Label(
             text="Aylık maaşa göre mesai, tatil, prim, avans ve kesinti hesabı",
