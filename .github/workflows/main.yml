@@ -1,39 +1,68 @@
 name: Build APK
-on: [push, workflow_dispatch]
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
 jobs:
   build:
+    name: APK Hazirla
     runs-on: ubuntu-22.04
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-      - uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+      - name: Kodu indir
+        uses: actions/checkout@v4
 
-      # DİSKTE YER AÇ (Broken Pipe'ı engellemek için kritik!)
-      - name: Disk Temizligi
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
+      - name: Python kur
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
 
-      - name: Paketleri Kur
+      - name: Java kur
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Sistem paketlerini kur
         run: |
           sudo apt update
-          sudo apt install -y git zip unzip autoconf libtool pkg-config zlib1g-dev \
-          libncurses5-dev libncursesw5-dev cmake libffi-dev libssl-dev \
-          build-essential libltdl-dev python3-pip lld
-          pip install --upgrade pip
-          pip install wheel setuptools "cython<3.0.0" buildozer
+          sudo apt install -y \
+            git \
+            zip \
+            unzip \
+            autoconf \
+            libtool \
+            pkg-config \
+            zlib1g-dev \
+            libncurses5-dev \
+            libncursesw5-dev \
+            cmake \
+            libffi-dev \
+            libssl-dev \
+            build-essential \
+            libltdl-dev \
+            python3-pip \
+            lld
 
-- name: APK Hazirla
-  env:
-    APP_ANDROID_ACCEPT_SDK_LICENSE: "1"
-  run: |
-    export PATH=$PATH:$HOME/.local/bin
-    buildozer -v android debug
-          # Buildozer'ın takılmaması için interaktif girişi kapat
+      - name: Buildozer kur
+        run: |
+          python -m pip install --upgrade pip
+          pip install --upgrade setuptools wheel
+          pip install "cython<3.0.0"
+          pip install buildozer
+
+      - name: APK Hazirla
+        env:
           APP_ANDROID_ACCEPT_SDK_LICENSE: "1"
+        run: |
+          export PATH=$PATH:$HOME/.local/bin
+          buildozer -v android debug
+
+      - name: APK dosyasini yukle
+        uses: actions/upload-artifact@v4
+        with:
+          name: maas-takip-apk
+          path: bin/*.apk
