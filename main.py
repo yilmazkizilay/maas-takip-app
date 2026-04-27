@@ -2,6 +2,7 @@ import os
 import csv
 import json
 from datetime import datetime
+from calendar import monthrange
 
 from kivy.app import App
 from kivy.core.window import Window
@@ -31,9 +32,11 @@ ALANLAR = [
     "prim",
     "avans",
     "kesinti",
+    "gunluk_ucret",
+    "normal_ucret",
     "tatil_ek_ucret",
     "mesai_ucret",
-    "toplam_ek",
+    "gun_toplami",
     "aciklama",
 ]
 
@@ -63,6 +66,22 @@ HAFTA_GUN_ADLARI = [
     "Cuma",
     "Cumartesi",
     "Pazar",
+]
+
+AY_ADLARI = [
+    "",
+    "Ocak",
+    "Şubat",
+    "Mart",
+    "Nisan",
+    "Mayıs",
+    "Haziran",
+    "Temmuz",
+    "Ağustos",
+    "Eylül",
+    "Ekim",
+    "Kasım",
+    "Aralık",
 ]
 
 GUN_TURU_SECENEKLERI = [
@@ -250,11 +269,7 @@ class MaasTakipApp(App):
         return root
 
     def panel(self):
-        return BoxLayout(
-            orientation="vertical",
-            padding=dp(12),
-            spacing=dp(8),
-        )
+        return BoxLayout(orientation="vertical", padding=dp(12), spacing=dp(8))
 
     def baslik(self, metin, alt=""):
         kutu = BoxLayout(
@@ -366,11 +381,7 @@ class MaasTakipApp(App):
         grid.add_widget(widget)
 
     def mesaj_goster(self, baslik, mesaj):
-        kutu = BoxLayout(
-            orientation="vertical",
-            padding=dp(14),
-            spacing=dp(12),
-        )
+        kutu = BoxLayout(orientation="vertical", padding=dp(14), spacing=dp(12))
 
         yazi = Label(
             text=mesaj,
@@ -383,6 +394,307 @@ class MaasTakipApp(App):
         btn = self.button("Tamam", RENK_BLUE)
 
         kutu.add_widget(yazi)
+        kutu.add_widget(btn)
+
+        popup = Popup(
+            title=baslik,
+            content=kutu,
+            size_hint=(0.86, 0.38),
+            background_color=(0.10, 0.14, 0.22, 1),
+            title_color=RENK_TEXT,
+        )
+
+        btn.bind(on_press=popup.dismiss)
+        popup.open()
+
+    def takvim_ac(self, hedef_input):
+        secili = tarih_parse(hedef_input.text) or datetime.now()
+        self.takvim_hedef_input = hedef_input
+        self.takvim_yil = secili.year
+        self.takvim_ay = secili.month
+
+        self.takvim_kutu = BoxLayout(
+            orientation="vertical",
+            padding=dp(10),
+            spacing=dp(8),
+        )
+
+        self.takvim_popup = Popup(
+            title="Tarih Seç",
+            content=self.takvim_kutu,
+            size_hint=(0.95, 0.75),
+            background_color=(0.10, 0.14, 0.22, 1),
+            title_color=RENK_TEXT,
+        )
+
+        self.takvim_ciz()
+        self.takvim_popup.open()
+
+    def takvim_ciz(self):
+        self.takvim_kutu.clear_widgets()
+
+        ust = BoxLayout(
+            orientation="horizontal",
+            size_hint_y=None,
+            height=dp(48),
+            spacing=dp(6),
+        )
+
+        onceki = self.button("<", RENK_BLUE)
+        sonraki = self.button(">", RENK_BLUE)
+
+        baslik = Label(
+            text=f"{AY_ADLARI[self.takvim_ay]} {self.takvim_yil}",
+            color=RENK_TEXT,
+            bold=True,
+            font_size=dp(18),
+        )
+
+        onceki.bind(on_press=lambda x: self.takvim_ay_degistir(-1))
+        sonraki.bind(on_press=lambda x: self.takvim_ay_degistir(1))
+
+        ust.add_widget(onceki)
+        ust.add_widget(baslik)
+        ust.add_widget(sonraki)
+
+        self.takvim_kutu.add_widget(ust)
+
+        grid = GridLayout(cols=7, spacing=dp(4))
+
+        for gun in ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"]:
+            grid.add_widget(
+                Label(
+                    text=gun,
+                    color=RENK_MUTED,
+                    bold=True,
+                    size_hint_y=None,
+                    height=dp(30),
+                )
+            )
+
+        ilk_gun_index, ay_gun_sayisi = monthrange(self.takvim_yil, self.takvim_ay)
+
+        for _ in range(ilk_gun_index):
+            grid.add_widget(Label(text=""))
+
+        for gun in range(1, ay_gun_sayisi + 1):
+            btn = Button(
+                text=str(gun),
+                background_normal="",
+                background_color=RENK_ORANGE,
+                color=RENK_TEXT,
+                bold=True,
+            )
+            btn.bind(on_press=lambda x, g=gun: self.takvim_tarih_sec(g))
+            grid.add_widget(btn)
+
+        self.takvim_kutu.add_widget(grid)
+
+    def takvim_ay_degistir(self, yon):
+        self.takvim_ay += yon
+
+        if self.takvim_ay < 1:
+            self.takvim_ay = 12
+            self.takvim_yil -= 1
+
+        if self.takvim_ay > 12:
+            self.takvim_ay = 1
+            self.takvim_yil += 1
+
+        self.takvim_ciz()
+
+    def takvim_tarih_sec(self, gun):
+        self.takvim_hedef_input.text = f"{gun:02d}.{self.takvim_ay:02d}.{self.takvim_yil}"
+        self.takvim_popup.dismiss()
+        self.kayit_onizleme_guncelle()
+
+    def ekran_ayarlar(self):
+        ana = self.panel()
+
+        ana.add_widget(
+            self.baslik(
+                "Ayarlar",
+                "Maaşını bir kere yaz; günlük ücret otomatik hesaplansın.",
+            )
+        )
+
+        grid = GridLayout(cols=2, spacing=dp(7), size_hint_y=None)
+        grid.bind(minimum_height=grid.setter("height"))
+
+        self.ayar_maas = self.input(self.ayarlar.get("aylik_maas", "0"), "Örn: 35000")
+        self.ayar_saat = self.input(self.ayarlar.get("gunluk_calisma_saati", "7.5"), "Örn: 7.5")
+        self.ayar_katsayi = self.input(self.ayarlar.get("mesai_katsayi", "1.5"), "Örn: 1.5")
+        self.ayar_tatil = self.spinner(
+            self.ayarlar.get("hafta_tatili_gunu", "Pazar"),
+            list(HAFTA_GUNLERI.keys()),
+        )
+
+        self.add_row(grid, "Aylık maaş", self.ayar_maas)
+        self.add_row(grid, "Günlük çalışma saati", self.ayar_saat)
+        self.add_row(grid, "Mesai katsayısı", self.ayar_katsayi)
+        self.add_row(grid, "Hafta tatilin", self.ayar_tatil)
+
+        ana.add_widget(grid)
+
+        self.ayar_bilgi = self.label("", size=14, muted=True, height=96)
+        ana.add_widget(self.ayar_bilgi)
+
+        btns = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(52), spacing=dp(8))
+
+        kaydet = self.button("Ayarları Kaydet", RENK_GREEN)
+        hesap = self.button("Hesabı Göster", RENK_BLUE)
+
+        kaydet.bind(on_press=self.ayarlari_kaydet)
+        hesap.bind(on_press=lambda x: self.ayar_bilgisi_guncelle())
+
+        btns.add_widget(kaydet)
+        btns.add_widget(hesap)
+
+        ana.add_widget(btns)
+
+        self.ayar_maas.bind(text=lambda *args: self.ayar_bilgisi_guncelle())
+        self.ayar_saat.bind(text=lambda *args: self.ayar_bilgisi_guncelle())
+
+        return ana
+
+    def ekran_kayit_ekle(self):
+        ana = self.panel()
+
+        ana.add_widget(
+            self.baslik(
+                "Kayıt Ekle",
+                "Takvimden gün seç; uygulama günlük ücreti ve ekleri hesaplasın.",
+            )
+        )
+
+        scroll = ScrollView()
+
+        grid = GridLayout(cols=2, spacing=dp(7), size_hint_y=None)
+        grid.bind(minimum_height=grid.setter("height"))
+
+        tarih_kutu = BoxLayout(
+            orientation="horizontal",
+            spacing=dp(6),
+            size_hint_y=None,
+            height=dp(44),
+        )
+
+        self.kayit_tarih = self.input(bugunun_tarihi(), "27.04.2026")
+        takvim_btn = self.button("Takvim", RENK_ORANGE)
+        takvim_btn.size_hint_x = None
+        takvim_btn.width = dp(82)
+        takvim_btn.height = dp(44)
+        takvim_btn.bind(on_press=lambda x: self.takvim_ac(self.kayit_tarih))
+
+        tarih_kutu.add_widget(self.kayit_tarih)
+        tarih_kutu.add_widget(takvim_btn)
+
+        self.kayit_gun_turu = self.spinner("Otomatik", GUN_TURU_SECENEKLERI)
+        self.kayit_calisma = self.spinner("Çalıştım", CALISMA_SECENEKLERI)
+        self.kayit_mesai = self.input("0", "Örn: 2")
+        self.kayit_prim = self.input("0", "Örn: 500")
+        self.kayit_avans = self.input("0", "Örn: 1000")
+        self.kayit_kesinti = self.input("0", "Örn: 250")
+        self.kayit_aciklama = self.input("", "Örn: Bayram mesaisi")
+
+        self.add_row(grid, "Tarih", tarih_kutu)
+        self.add_row(grid, "Gün türü", self.kayit_gun_turu)
+        self.add_row(grid, "Durum", self.kayit_calisma)
+        self.add_row(grid, "Ek mesai saati", self.kayit_mesai)
+        self.add_row(grid, "Prim", self.kayit_prim)
+        self.add_row(grid, "Avans", self.kayit_avans)
+        self.add_row(grid, "Kesinti", self.kayit_kesinti)
+        self.add_row(grid, "Açıklama", self.kayit_aciklama)
+
+        scroll.add_widget(grid)
+        ana.add_widget(scroll)
+
+        self.kayit_onizleme = self.label("", size=13, muted=True, height=124)
+        ana.add_widget(self.kayit_onizleme)
+
+        btns = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(52), spacing=dp(8))
+
+        hesap = self.button("Hesapla", RENK_BLUE)
+        kaydet = self.button("Kaydet", RENK_GREEN)
+
+        hesap.bind(on_press=lambda x: self.kayit_onizleme_guncelle())
+        kaydet.bind(on_press=self.kaydet)
+
+        btns.add_widget(hesap)
+        btns.add_widget(kaydet)
+
+        ana.add_widget(btns)
+
+        self.kayit_tarih.bind(text=lambda *args: self.kayit_onizleme_guncelle())
+        self.kayit_mesai.bind(text=lambda *args: self.kayit_onizleme_guncelle())
+        self.kayit_prim.bind(text=lambda *args: self.kayit_onizleme_guncelle())
+        self.kayit_avans.bind(text=lambda *args: self.kayit_onizleme_guncelle())
+        self.kayit_kesinti.bind(text=lambda *args: self.kayit_onizleme_guncelle())
+        self.kayit_gun_turu.bind(text=lambda *args: self.kayit_onizleme_guncelle())
+        self.kayit_calisma.bind(text=lambda *args: self.kayit_onizleme_guncelle())
+
+        return ana
+
+    def ekran_kayitlar(self):
+        ana = self.panel()
+
+        ana.add_widget(
+            self.baslik(
+                "Kayıtlar",
+                "Her kayıt günlük parayı gösterir. Numara yazarak silebilirsin.",
+            )
+        )
+
+        filtre = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(48), spacing=dp(7))
+
+        self.kayitlar_ay = self.input(bu_ay(), "Ay: 04.2026")
+
+        ay_btn = self.button("Ay", RENK_ORANGE)
+        tum_btn = self.button("Tümü", RENK_BLUE)
+
+        ay_btn.bind(on_press=lambda x: self.kayitlari_listele())
+        tum_btn.bind(on_press=self.kayitlar_tumunu_goster)
+
+        filtre.add_widget(self.kayitlar_ay)
+        filtre.add_widget(ay_btn)
+        filtre.add_widget(tum_btn)
+
+        ana.add_widget(filtre)
+
+        sil = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(48), spacing=dp(7))
+
+        self.silinecek_no = self.input("", "Silinecek no")
+        self.silinecek_no.input_filter = "int"
+
+        sil_btn = self.button("Kaydı Sil", RENK_RED)
+        sil_btn.bind(on_press=self.kaydi_sil)
+
+        sil.add_widget(self.silinecek_no)
+        sil.add_widget(sil_btn)
+
+        ana.add_widget(sil)
+
+        self.kayitlar_ozet = self.label("", size=13, muted=True, height=112)
+        ana.add_widget(self.kayitlar_ozet)
+
+        scroll = ScrollView()
+
+        self.kayit_label = self.label("", size=13)
+        self.kayit_label.size_hint_y = None
+        self.kayit_label.bind(texture_size=self.label_height)
+
+        scroll.add_widget(self.kayit_label)
+        ana.add_widget(scroll)
+
+        return ana
+
+    def ekran_ozet(self):
+        ana = self.panel()
+
+        ana.add_widget(
+            self.baslik(
+                "Aylık Özet",
+                "Kaydedilen günlerin toplamı: günl     kutu.add_widget(yazi)
         kutu.add_widget(btn)
 
         popup = Popup(
