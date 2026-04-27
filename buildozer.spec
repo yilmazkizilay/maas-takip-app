@@ -12,5 +12,6 @@ android.minapi = 21
 android.archs = arm64-v8a
 icon.filename = icon.png
 presplash.filename = loading.png
+
 [buildozer]
 log_level = 2
