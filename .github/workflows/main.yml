@@ -2,7 +2,7 @@ name: Build APK
 on: [push, workflow_dispatch]
 jobs:
   build:
-    runs-on: ubuntu-22.04 # Sürümü sabitledik ki sürpriz yaşatmasın
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -12,7 +12,15 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-      - name: Sistem Paketlerini Kur
+
+      # DİSKTE YER AÇ (Broken Pipe'ı engellemek için kritik!)
+      - name: Disk Temizligi
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+
+      - name: Paketleri Kur
         run: |
           sudo apt update
           sudo apt install -y git zip unzip autoconf libtool pkg-config zlib1g-dev \
@@ -20,13 +28,14 @@ jobs:
           build-essential libltdl-dev python3-pip lld
           pip install --upgrade pip
           pip install wheel setuptools "cython<3.0.0" buildozer
+
       - name: APK Hazirla
         run: |
           export PATH=$PATH:$HOME/.local/bin
-          # Önbelleği temizle ve build başlat
-          rm -rf .buildozer
-          yes | buildozer -v android debug
-      - uses: actions/upload-artifact@v4
-        with:
-          name: maas-takip-apk
-          path: bin/*.apk
+          # Önceki tüm kalıntıları temizle
+          buildozer android clean
+          # yes | kullanmadan, daha kontrollü build
+          buildozer -v android debug
+        env:
+          # Buildozer'ın takılmaması için interaktif girişi kapat
+          APP_ANDROID_ACCEPT_SDK_LICENSE: "1"
