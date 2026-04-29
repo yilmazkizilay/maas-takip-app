@@ -1,39 +1,194 @@
-# -*- coding: utf-8 -*-
-"""
-Maaş Takip v0.7
-- Android'da PermissionError / Error 13 riskini azaltmak için kayıtlar uygulamanın kendi yazılabilir klasörüne alınır.
-- Kartlara uzun basınca düzenle / sil menüsü açılır.
-- Kayıt ekleme, düzenleme ve aylık gösterim tarihleri takvimden seçilir.
-
-Buildozer ile paketlerken buildozer.spec dosyasındaki version = 0.7 olmalı.
-"""
-
-from __future__ import annotations
-
-import calendar
-import json
 import os
-import shutil
-import uuid
-from datetime import date, datetime
-from typing import Callable, Dict, List, Optional
-
+import json
+from datetime import datetime
 from kivy.app import App
-from kivy.clock import Clock
-from kivy.core.clipboard import Clipboard
-from kivy.core.window import Window
-from kivy.metrics import dp
-from kivy.properties import ObjectProperty
-from kivy.uix.anchorlayout import AnchorLayout
 from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.button import Button
-from kivy.uix.gridlayout import GridLayout
 from kivy.uix.label import Label
-from kivy.uix.popup import Popup
-from kivy.uix.scrollview import ScrollView
-from kivy.uix.spinner import Spinner
+from kivy.uix.button import Button
 from kivy.uix.textinput import TextInput
-from kivy.utils import platform
+from kivy.uix.scrollview import ScrollView
+from kivy.uix.screenmanager import ScreenManager, Screen
+from kivy.uix.popup import Popup
+from kivy.uix.spinner import Spinner
+from kivy.core.window import Window
+from kivy.graphics import Color, RoundedRectangle
+
+# --- PROFESYONEL TASARIM BİLEŞENLERİ ---
+class ModernButton(Button):
+    def __init__(self, bg_color=(0.1, 0.6, 0.3, 1), **kwargs):
+        super().__init__(**kwargs)
+        self.background_normal = ''
+        self.background_color = (0, 0, 0, 0)
+        self.color = (1, 1, 1, 1)
+        self.bold = True
+        with self.canvas.before:
+            Color(*bg_color)
+            self.rect = RoundedRectangle(size=self.size, pos=self.pos, radius=[12])
+        self.bind(pos=self.update_rect, size=self.update_rect)
+
+    def update_rect(self, *args):
+        self.rect.pos = self.pos
+        self.rect.size = self.size
+
+# --- 1. KAYIT EKRANI ---
+class KayitEkrani(Screen):
+    def __init__(self, app, **kwargs):
+        super().__init__(**kwargs)
+        self.app = app
+        layout = BoxLayout(orientation='vertical', padding=20, spacing=15)
+
+        layout.add_widget(Label(text="MESAİ KAYDI", font_size=26, bold=True, color=(0.2, 0.8, 0.4, 1), size_hint_y=None, height=60))
+
+        # Tarih Seçici Bölümü
+        layout.add_widget(Label(text="Çalışma Tarihi Seçin:", size_hint_y=None, height=30))
+        self.btn_tarih = ModernButton(text=datetime.now().strftime('%d.%m.%Y'), size_hint_y=None, height=55, bg_color=(0.2, 0.2, 0.2, 1))
+        self.btn_tarih.bind(on_press=self.tarih_secici_ac)
+        layout.add_widget(self.btn_tarih)
+
+        # Saat Girişi
+        layout.add_widget(Label(text="Çalışma Saati:", size_hint_y=None, height=30))
+        self.saat_input = TextInput(text="8", multiline=False, input_filter='float', size_hint_y=None, height=50, font_size=20, halign='center')
+        layout.add_widget(self.saat_input)
+
+        # Not Alanı
+        layout.add_widget(Label(text="Açıklama / Not:", size_hint_y=None, height=30))
+        self.not_input = TextInput(hint_text="İsteğe bağlı...", size_hint_y=None, height=50)
+        layout.add_widget(self.not_input)
+
+        layout.add_widget(Label(size_hint_y=1)) # Esnek boşluk
+
+        # Kaydet Butonu
+        btn_kaydet = ModernButton(text="KAYDI TAMAMLA", size_hint_y=None, height=65, font_size=18)
+        btn_kaydet.bind(on_press=self.kaydet)
+        layout.add_widget(btn_kaydet)
+
+        self.add_widget(layout)
+
+    def tarih_secici_ac(self, *args):
+        icerik = BoxLayout(orientation='vertical', padding=10, spacing=10)
+        secici = BoxLayout(spacing=5, size_hint_y=None, height=50)
+        
+        self.gun = Spinner(text=datetime.now().strftime('%d'), values=[str(i).zfill(2) for i in range(1, 32)])
+        self.ay = Spinner(text=datetime.now().strftime('%m'), values=[str(i).zfill(2) for i in range(1, 13)])
+        self.yil = Spinner(text=datetime.now().strftime('%Y'), values=[str(i) for i in range(2025, 2030)])
+        
+        secici.add_widget(self.gun); secici.add_widget(self.ay); secici.add_widget(self.yil)
+        icerik.add_widget(secici)
+        
+        btn = ModernButton(text="SEÇ", size_hint_y=None, height=50)
+        icerik.add_widget(btn)
+        
+        popup = Popup(title="Tarih Seçimi", content=icerik, size_hint=(0.8, 0.4))
+        btn.bind(on_press=lambda x: self.tarih_onayla(popup))
+        popup.open()
+
+    def tarih_onayla(self, popup):
+        self.btn_tarih.text = f"{self.gun.text}.{self.ay.text}.{self.yil.text}"
+        popup.dismiss()
+
+    def kaydet(self, *args):
+        veri = {"tarih": self.btn_tarih.text, "saat": self.saat_input.text, "not": self.not_input.text}
+        self.app.veri_ekle(veri)
+        self.not_input.text = ""
+        self.app.ekran_degistir("Gecmis")
+
+# --- 2. GEÇMİŞ EKRANI ---
+class GecmisEkrani(Screen):
+    def __init__(self, app, **kwargs):
+        super().__init__(**kwargs)
+        self.app = app
+        self.layout = BoxLayout(orientation='vertical', padding=15, spacing=10)
+        self.layout.add_widget(Label(text="KAYIT GEÇMİŞİ", font_size=20, bold=True, size_hint_y=None, height=50))
+        
+        self.scroll = ScrollView()
+        self.liste = BoxLayout(orientation='vertical', size_hint_y=None, spacing=8)
+        self.liste.bind(minimum_height=self.liste.setter('height'))
+        self.scroll.add_widget(self.liste)
+        
+        self.layout.add_widget(self.scroll)
+        self.add_widget(self.layout)
+
+    def on_enter(self):
+        self.liste.clear_widgets()
+        veriler = self.app.verileri_oku()
+        for v in reversed(veriler):
+            item = BoxLayout(orientation='vertical', size_hint_y=None, height=80, padding=10)
+            with item.canvas.before:
+                Color(0.15, 0.15, 0.15, 1)
+                RoundedRectangle(size=item.size, pos=item.pos, radius=[10])
+            item.add_widget(Label(text=f"[b]{v['tarih']}[/b]  |  {v['saat']} Saat", markup=True, color=(0.2, 0.8, 0.4, 1)))
+            item.add_widget(Label(text=v['not'] if v['not'] else "Not yok", font_size=13, color=(0.6, 0.6, 0.6, 1)))
+            self.liste.add_widget(item)
+
+# --- 3. ÖZET EKRANI ---
+class OzetEkrani(Screen):
+    def __init__(self, app, **kwargs):
+        super().__init__(**kwargs)
+        self.app = app
+        self.layout = BoxLayout(orientation='vertical', padding=30, spacing=20)
+        self.layout.add_widget(Label(text="AYLIK İSTATİSTİK", font_size=22, bold=True, color=(0.2, 0.8, 0.4, 1)))
+        
+        self.gun_lbl = Label(text="Toplam Gün: 0", font_size=18)
+        self.saat_lbl = Label(text="Toplam Saat: 0", font_size=18)
+        
+        self.layout.add_widget(self.gun_lbl)
+        self.layout.add_widget(self.saat_lbl)
+        self.layout.add_widget(Label(size_hint_y=1))
+        self.add_widget(self.layout)
+
+    def on_enter(self):
+        veriler = self.app.verileri_oku()
+        toplam_saat = sum(float(v['saat']) for v in veriler if v['saat'])
+        self.gun_lbl.text = f"Çalışılan Toplam Gün: [b]{len(veriler)}[/b]"
+        self.saat_lbl.text = f"Toplam Mesai Saati: [b]{toplam_saat}[/b]"
+        self.gun_lbl.markup = self.saat_lbl.markup = True
+
+# --- ANA UYGULAMA SINIFI ---
+class MaasPro(App):
+    def build(self):
+        Window.clearcolor = (0.08, 0.08, 0.08, 1)
+        self.db = os.path.join(self.user_data_dir, 'database.json')
+        
+        ana_layout = BoxLayout(orientation='vertical')
+        
+        self.sm = ScreenManager()
+        self.sm.add_widget(KayitEkrani(self, name="Kayit"))
+        self.sm.add_widget(GecmisEkrani(self, name="Gecmis"))
+        self.sm.add_widget(OzetEkrani(self, name="Ozet"))
+        
+        ana_layout.add_widget(self.sm)
+
+        # Sekme Menüsü (Navigasyon)
+        nav = BoxLayout(size_hint_y=None, height=65, padding=5, spacing=5)
+        btn_k = ModernButton(text="YENİ", bg_color=(0.15, 0.15, 0.15, 1))
+        btn_g = ModernButton(text="GEÇMİŞ", bg_color=(0.15, 0.15, 0.15, 1))
+        btn_o = ModernButton(text="ÖZET", bg_color=(0.15, 0.15, 0.15, 1))
+        
+        btn_k.bind(on_press=lambda x: self.ekran_degistir("Kayit"))
+        btn_g.bind(on_press=lambda x: self.ekran_degistir("Gecmis"))
+        btn_o.bind(on_press=lambda x: self.ekran_degistir("Ozet"))
+        
+        nav.add_widget(btn_k); nav.add_widget(btn_g); nav.add_widget(btn_o)
+        ana_layout.add_widget(nav)
+        
+        ana_layout.add_widget(Label(text="v1.0.0 Pro", size_hint_y=None, height=20, font_size=10, color=(0.4, 0.4, 0.4, 1)))
+        return ana_layout
+
+    def ekran_degistir(self, isim):
+        self.sm.current = isim
+
+    def verileri_oku(self):
+        if not os.path.exists(self.db): return []
+        with open(self.db, 'r', encoding='utf-8') as f: return json.load(f)
+
+    def veri_ekle(self, veri):
+        veriler = self.verileri_oku()
+        veriler.append(veri)
+        with open(self.db, 'w', encoding='utf-8') as f:
+            json.dump(veriler, f, ensure_ascii=False, indent=4)
+
+if __name__ == "__main__":
+    MaasPro().run()
 from kivy.graphics import Color, RoundedRectangle
 
 APP_VERSION = "0.7"
